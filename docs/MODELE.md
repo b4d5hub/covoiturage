@@ -4,9 +4,11 @@ Ce document présente le modèle de données et explique ses choix. Les règles 
 
 ## Diagramme entité-association
 
-![Diagramme entité-association : dix tables et leurs seize relations](modele-donnees.png)
+![Diagramme entité-association : dix tables et leurs quatorze relations](modele-donnees.png)
 
-Le diagramme montre les dix tables, toutes leurs colonnes et leurs seize relations. Les types y sont simplifiés ; les longueurs exactes figurent dans les entités Doctrine. La source modifiable est [modele-donnees.drawio](modele-donnees.drawio).
+Le diagramme montre les dix tables, toutes leurs colonnes et leurs quatorze relations. Les types y sont simplifiés ; les longueurs exactes figurent dans les entités Doctrine. La source modifiable est [modele-donnees.drawio](modele-donnees.drawio).
+
+Les cardinalités sont celles que la base impose. Deux règles métier sont plus strictes et relèvent de l'application : un trajet comporte au moins deux étapes et N − 1 segments, et chaque réservation doit avoir un paiement simulé (prévu au niveau 2).
 
 ## Entités
 
@@ -29,9 +31,9 @@ Chaque entité correspond à une table au nom en `snake_case`, à l'exception de
 
 ### Le segment comme unité de calcul
 
-Un trajet de N étapes comporte N − 1 segments. Le segment de rang `p` relie l'étape de rang `p` à l'étape de rang `p + 1`. Une réservation couvre les segments dont le rang est compris entre le rang de son étape de montée (inclus) et le rang de son étape de descente (exclu).
+Un trajet de N étapes comporte N − 1 segments. Le segment de rang `p` relie les étapes de rang `p` et `p + 1` : ses extrémités se déduisent des rangs et ne sont pas stockées.
 
-L'occupation d'un segment se déduit donc des réservations confirmées :
+Une réservation couvre les segments dont le rang est compris entre le rang de son étape de montée (inclus) et celui de son étape de descente (exclu) :
 
 ```text
 occupation(p) = somme des places des réservations confirmées
@@ -40,11 +42,15 @@ occupation(p) = somme des places des réservations confirmées
 
 Exemple sur Agadir – Marrakech – Casablanca : une réservation Agadir – Marrakech occupe le segment 0 et laisse le segment 1 libre.
 
-Il n'y a **ni table de liaison réservation–segment, ni compteur de places** : l'occupation a une seule source, les réservations, et ne peut pas diverger. Le calcul et le verrouillage sont détaillés dans [DECISIONS.md](DECISIONS.md).
+Déduire les extrémités des rangs supprime un risque d'incohérence, mais pas tous. La base garantit seulement l'unicité des rangs : leur continuité et le nombre de segments sont contrôlés par l'application.
+
+### Occupation sans compteur
+
+Il n'y a ni table de liaison réservation–segment, ni compteur de places. L'occupation est calculée depuis les réservations, ce qui évite de maintenir une valeur dupliquée. Son exactitude en cas d'accès concurrents repose sur le verrouillage du trajet et la lecture décrits dans [DECISIONS.md](DECISIONS.md).
 
 ### Le conducteur n'est pas stocké sur le trajet
 
-Le conducteur d'un trajet est le propriétaire de son véhicule (`Trip::getDriver()`). Une colonne supplémentaire ferait exister la même information deux fois, avec un risque d'incohérence.
+Le conducteur d'un trajet est le propriétaire de son véhicule (`Trip::getDriver()`). Pour que cette déduction reste juste dans le temps, le propriétaire d'un véhicule utilisé par un trajet ne peut plus changer, et le véhicule d'un trajet existant non plus.
 
 ### Montants et distances en entiers
 
@@ -52,19 +58,23 @@ Les montants sont en centimes de MAD et les distances en mètres, tous stockés 
 
 ### Gel de l'itinéraire
 
-`trip.itinerary_frozen_at` est renseignée dans la transaction de la première réservation confirmée et n'est jamais remise à zéro. Le gel reste donc acquis même si les réservations sont annulées ou si une ligne de réservation est supprimée.
+`trip.itinerary_frozen_at` ne peut être renseignée qu'une fois, sans retour possible, et un itinéraire gelé ne peut plus être modifié.
 
 ### Conservation de l'historique
 
-Les clés étrangères n'ont pas de suppression en cascade au niveau de la base : un compte, un véhicule ou un trajet référencé par des réservations ne peut pas être supprimé. Les annulations sont des changements d'état, pas des suppressions.
+Aucune clé étrangère ne supprime en cascade : une ligne référencée par une autre ne peut pas être supprimée. Les annulations sont des changements d'état, pas des suppressions.
 
 ### Coordonnées et horaires
 
-Les coordonnées sont en `DECIMAL(9,6)`, ce qui couvre toute la plage de longitude avec une précision d'environ 10 cm. Les horaires sont stockés à l'heure du Maroc (`Africa/Casablanca`), fuseau configuré pour PHP. La première étape n'a pas d'heure d'arrivée et la dernière n'a pas d'heure de départ.
+Les coordonnées sont en `DECIMAL(9,6)`, ce qui couvre toute la plage de longitude avec une précision d'environ 10 cm.
+
+Les dates sont stockées et traitées en UTC, ce qui rend les comparaisons insensibles aux changements d'heure du Maroc. La première étape n'a pas d'heure d'arrivée et la dernière n'a pas d'heure de départ.
 
 ## Contraintes en base
 
-Les contraintes d'unicité sont déclarées dans les entités et marquées `UK` sur le diagramme, ou portent sur plusieurs colonnes :
+Les colonnes facultatives sont les dates d'annulation, de fin, de remboursement et de gel, `arrival_at`, `departure_at`, `trip.cancellation_reason` et `review.comment` ; toutes les autres sont `NOT NULL`.
+
+Les contraintes d'unicité portent sur les colonnes marquées `UK` et sur ces combinaisons :
 
 | Table | Colonnes uniques ensemble |
 |---|---|
@@ -72,16 +82,35 @@ Les contraintes d'unicité sont déclarées dans les entités et marquées `UK` 
 | `trip_segment` | `trip_id`, `position` |
 | `review` | `trip_id`, `author_id`, `target_id` |
 
-Les contrôles `CHECK` portent uniquement sur la validité d'une ligne et sont ajoutés dans la migration, car Doctrine ne les génère pas :
+Les contrôles `CHECK` portent uniquement sur la validité d'une ligne. Ils ne sont pas générés à partir du mapping Doctrine : ils sont écrits à la main dans la migration initiale.
 
 | Table | Contrôle |
 |---|---|
 | `vehicle` | `passenger_seats > 0` |
 | `trip` | `seat_capacity > 0`, `full_price_cents > 0` |
 | `trip_stop` | `position >= 0` ; latitude entre −90 et 90 ; longitude entre −180 et 180 ; au moins un horaire renseigné ; départ postérieur ou égal à l'arrivée |
-| `trip_segment` | `position >= 0`, `distance_meters > 0`, étapes de début et de fin différentes |
+| `trip_segment` | `position >= 0`, `distance_meters > 0` |
 | `booking` | `seats > 0` ; montants positifs ou nuls ; `total_price_cents = seat_price_cents * seats` ; étapes de montée et de descente différentes |
 | `payment` | `amount_cents >= 0` |
 | `review` | `rating` entre 1 et 5 ; auteur et destinataire différents |
 
-Les règles qui concernent plusieurs lignes sont appliquées dans le code métier : disponibilité des places, ordre des étapes d'une réservation, réservation active unique par passager et par trajet.
+## Règles appliquées hors de la base
+
+Ces règles portent sur plusieurs lignes. Elles sont contrôlées par les entités, à la validation et à l'écriture par Doctrine ; une requête SQL directe peut les contourner.
+
+**Déjà en place et testées**
+
+- les étapes d'une réservation appartiennent à son trajet, et la montée précède la descente ;
+- rangs d'étapes et de segments consécutifs, N − 1 segments, distances positives, horaires cohérents ;
+- modification de l'itinéraire uniquement par `Trip::replaceItinerary()`, refusée une fois le trajet gelé ;
+- propriétaire du véhicule et véhicule du trajet fixes, dans les conditions décrites plus haut ;
+- capacité strictement positive, au plus égale aux places du véhicule, et jamais inférieure à l'occupation.
+
+**Prévues au niveau 2, pas encore implémentées**
+
+- création d'une réservation sous verrou, avec contrôle de disponibilité ;
+- interdiction de réserver son propre trajet, et réservation active unique par passager et par trajet ;
+- gel de l'itinéraire à la première réservation confirmée ;
+- paiement simulé et remboursements ;
+- annulations par le passager et par le conducteur, et notifications associées ;
+- fin de trajet et avis.

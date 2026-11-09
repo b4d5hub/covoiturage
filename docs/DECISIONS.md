@@ -70,7 +70,7 @@ Le passager et le conducteur se notent **mutuellement**. Il n'y a pas d'avis ent
 | Villes | Le conducteur choisit dans une liste gérée depuis le back-office. |
 | Notifications | Entité simple : destinataire, message, date de création, état de lecture. Affichées dans l'espace passager, sans e-mail. |
 | Données de démonstration | Points de rendez-vous publics uniquement (gares routières, etc.), aucune adresse privée. Aucune donnée personnelle réelle : les profils de démonstration sont fictifs. Coordonnées et distances valides. |
-| Conventions | Montants en MAD, fuseau horaire `Africa/Casablanca`. |
+| Conventions | Montants en MAD. Dates stockées et traitées en UTC ; saisie et affichage à l'heure du Maroc (`Africa/Casablanca`). Voir la révision du 2026-11-09 en fin de journal. |
 
 ### Prévention des surréservations
 
@@ -112,3 +112,21 @@ Les contraintes `CHECK` servent uniquement aux validations simples sur une ligne
 | Configuration | `.env` n'est pas versionné : il est généré depuis `.env.example`, avec un `APP_SECRET` créé localement. | Aucun secret dans le dépôt. |
 | Base de données locale | `compose.yaml` fournit un mot de passe par défaut, surchargeable, réservé au conteneur local. MySQL n'est pas exposé sur la machine hôte et le mot de passe root est aléatoire. | Permet une installation en une commande sans secret réel dans le dépôt. |
 | Langue | Documentation, messages de commit et interface en français ; identifiants de code en anglais. | Public francophone ; conventions de Symfony et Doctrine. |
+| Tests | Base MySQL dédiée (service `db_test`, profil `test`), construite par les migrations. | Les contraintes `CHECK` et les lectures verrouillantes doivent être vérifiées sur un vrai MySQL. |
+
+---
+
+## 2026-11-09 — Révision du modèle après audit
+
+Un audit du modèle a montré que plusieurs conditions étaient supposées sans être contrôlées. Les décisions métier précédentes restent inchangées.
+
+| Sujet | Décision | Justification |
+|---|---|---|
+| Fuseau horaire (remplace le stockage à l'heure du Maroc) | Dates stockées et traitées en UTC ; conversion vers `Africa/Casablanca` à la saisie et à l'affichage. Un type Doctrine convertit toute date en UTC à l'écriture. | Le Maroc change d'heure autour du ramadan : une heure locale peut exister deux fois ou ne pas exister. L'UTC rend les comparaisons exactes. |
+| Délai d'annulation | Les deux heures sont calculées en UTC depuis le départ de l'étape de montée. | Ce sont deux heures réelles, même si l'heure affichée change entre la limite et le départ. |
+| Extrémités des segments | Les colonnes `from_stop_id` et `to_stop_id` sont supprimées : le segment de rang `p` relie les étapes `p` et `p + 1`. | Les extrémités se déduisent des rangs. L'application contrôle la continuité des rangs et le nombre de segments. |
+| Modification de l'itinéraire | Un point d'entrée unique, `Trip::replaceItinerary()`, recalcule les rangs et refuse un trajet gelé. | Une modification ne peut pas laisser un itinéraire partiellement incohérent. |
+| Horaires des étapes | La première étape a un départ seul, la dernière une arrivée seule, les autres les deux, dans l'ordre chronologique. | Le délai d'annulation et la recherche reposent sur ces horaires. |
+| Conducteur historique | Pas de colonne `trip.driver_id`. Le propriétaire d'un véhicule utilisé par un trajet et le véhicule d'un trajet existant ne peuvent plus changer. | Le conducteur reste déductible du véhicule sans donnée dupliquée. |
+| Capacité | Strictement positive, au plus égale aux places du véhicule, jamais inférieure à l'occupation. Les places d'un véhicule ne peuvent pas descendre sous la capacité d'un trajet qui l'utilise, y compris un trajet passé. | La règle reste vraie pour tous les trajets, sans cas particulier selon leur état. |
+| Gel de l'itinéraire | Opération à sens unique : aucune méthode ne permet de l'annuler. | Le gel est définitif par décision du projet. |
