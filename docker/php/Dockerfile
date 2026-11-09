@@ -9,6 +9,8 @@ RUN apt-get update \
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 ENV COMPOSER_ALLOW_SUPERUSER=1
 
+COPY app.ini /usr/local/etc/php/conf.d/app.ini
+
 COPY entrypoint.sh /usr/local/bin/app-entrypoint
 RUN chmod +x /usr/local/bin/app-entrypoint
 
