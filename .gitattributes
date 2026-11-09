@@ -1,0 +1,4 @@
+# Fins de ligne LF partout : les scripts doivent s'exécuter dans les conteneurs Linux.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
