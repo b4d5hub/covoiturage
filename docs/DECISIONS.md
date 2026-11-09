@@ -144,3 +144,19 @@ Un audit du modèle a montré que plusieurs conditions étaient supposées sans 
 | Saisie des prix | Montant en MAD converti en centimes par analyse du texte, sans nombre flottant. | Le champ monétaire d'EasyAdmin passe par un nombre flottant. |
 | Données de démonstration | Personnes fictives, adresses `@covoiturage.test`, points de rendez-vous publics, coordonnées approximatives et distances arrondies. Dates relatives au jour du chargement. | La démonstration reste à jour sans donnée réelle. |
 | Mot de passe de démonstration | Commun aux comptes fictifs et lu depuis la variable `DEMO_PASSWORD`, dont la valeur figure dans `.env.example`. | Le sujet demande de documenter des comptes de démonstration. Cette valeur ne protège aucune donnée réelle. |
+
+---
+
+## 2026-11-09 — Précisions d'application des règles métier
+
+Ces précisions fixent les cas limites des règles déjà décidées, sans les modifier.
+
+| Sujet | Décision | Justification |
+|---|---|---|
+| Limite d'annulation du passager | L'instant exact situé deux heures avant le départ de l'étape de montée est encore accepté. | « Jusqu'à 2 heures avant » inclut cette limite. |
+| Fin des réservations | Une réservation est refusée à partir de l'heure de départ exacte de l'étape de montée. Une étape intermédiaire reste réservable après le début du trajet. | La règle porte sur le départ de l'étape de montée, pas sur celui du trajet. |
+| Annulation d'un trajet | Possible jusqu'à l'instant précédant le départ de la première étape, par le conducteur uniquement. | La règle désigne le conducteur ; un administrateur peut seulement marquer un trajet comme effectué. |
+| Fin de trajet | Possible à partir de l'heure d'arrivée prévue à la dernière étape. | « Après l'arrivée prévue » s'apprécie sur l'horaire publié. |
+| Délai des avis | Quatorze jours après la date à laquelle le trajet est marqué effectué, limite incluse. | Cette date confirme que le trajet a eu lieu. |
+| Passager d'un trajet effectué | Seul un passager dont la réservation est restée confirmée peut déposer ou recevoir un avis. | Une réservation annulée ne correspond à aucun trajet effectué. |
+| Lecture sous verrou | Les lectures qui décident d'une opération suivent le verrou du trajet et utilisent une lecture verrouillante ou un rechargement. | Elles portent ainsi sur le dernier état validé. |

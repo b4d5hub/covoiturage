@@ -8,7 +8,7 @@ Ce document présente le modèle de données et explique ses choix. Les règles 
 
 Le diagramme montre les dix tables, toutes leurs colonnes et leurs quatorze relations. Les types y sont simplifiés ; les longueurs exactes figurent dans les entités Doctrine. La source modifiable est [modele-donnees.drawio](modele-donnees.drawio).
 
-Les cardinalités sont celles que la base impose. Deux règles métier sont plus strictes et relèvent de l'application : un trajet comporte au moins deux étapes et N − 1 segments, et chaque réservation doit avoir un paiement simulé (prévu au niveau 2).
+Les cardinalités sont celles que la base impose. Deux règles métier sont plus strictes et relèvent de l'application : un trajet comporte au moins deux étapes et N − 1 segments, et chaque réservation a un paiement simulé, créé dans la même transaction.
 
 ## Entités
 
@@ -58,7 +58,7 @@ Les montants sont en centimes de MAD et les distances en mètres, tous stockés 
 
 ### Gel de l'itinéraire
 
-`trip.itinerary_frozen_at` ne peut être renseignée qu'une fois, sans retour possible, et un itinéraire gelé ne peut plus être modifié.
+`trip.itinerary_frozen_at` est renseignée dans la transaction de la première réservation confirmée, une seule fois et sans retour possible. Un itinéraire gelé ne peut plus être modifié.
 
 ### Conservation de l'historique
 
@@ -105,13 +105,13 @@ Ces règles portent sur plusieurs lignes. Elles sont contrôlées par les entit�
 - modification de l'itinéraire uniquement par `Trip::replaceItinerary()`, refusée une fois le trajet gelé ;
 - propriétaire du véhicule et véhicule du trajet fixes, dans les conditions décrites plus haut ;
 - capacité strictement positive, au plus égale aux places du véhicule, et jamais inférieure à l'occupation ;
-- calcul du prix d'une portion, proportionnel à la distance.
-
-**Prévues au niveau 2, pas encore implémentées**
-
-- création d'une réservation sous verrou, avec contrôle de disponibilité ;
+- calcul du prix d'une portion, proportionnel à la distance ;
+- création d'une réservation sous verrou, avec contrôle de disponibilité sur chaque segment demandé ;
 - interdiction de réserver son propre trajet, et réservation active unique par passager et par trajet ;
 - gel de l'itinéraire à la première réservation confirmée ;
-- paiement simulé et remboursements ;
+- paiement simulé, créé avec la réservation, et remboursements intégraux ;
 - annulations par le passager et par le conducteur, et notifications associées ;
+- états à sens unique : trajet publié puis annulé ou effectué, réservation confirmée puis annulée, paiement payé puis remboursé ;
 - fin de trajet et avis.
+
+Ces opérations sont portées par les services de l'application. Les écrans passager et conducteur qui les appelleront sont prévus au niveau 3.
