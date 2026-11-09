@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Enum\PaymentStatus;
+use App\Exception\DomainRuleException;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
@@ -76,11 +77,15 @@ class Payment
         return $this->status->label();
     }
 
-    public function setStatus(PaymentStatus $status): static
+    /** Remboursement simulé et intégral, possible une seule fois. */
+    public function refund(\DateTimeImmutable $at): void
     {
-        $this->status = $status;
+        if (PaymentStatus::Paid !== $this->status) {
+            throw new DomainRuleException('Ce paiement est déjà remboursé.');
+        }
 
-        return $this;
+        $this->status = PaymentStatus::Refunded;
+        $this->refundedAt = $at;
     }
 
     public function getPaidAt(): \DateTimeImmutable
@@ -98,12 +103,5 @@ class Payment
     public function getRefundedAt(): ?\DateTimeImmutable
     {
         return $this->refundedAt;
-    }
-
-    public function setRefundedAt(?\DateTimeImmutable $refundedAt): static
-    {
-        $this->refundedAt = $refundedAt;
-
-        return $this;
     }
 }

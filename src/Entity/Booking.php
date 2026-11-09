@@ -177,11 +177,35 @@ class Booking
         return $this->status->label();
     }
 
-    public function setStatus(BookingStatus $status): static
+    public function isConfirmed(): bool
     {
-        $this->status = $status;
+        return BookingStatus::Confirmed === $this->status;
+    }
 
-        return $this;
+    /** Annulation par le passager, possible jusqu'à la limite de deux heures incluse. */
+    public function cancelByPassenger(\DateTimeImmutable $at): void
+    {
+        if ($at > $this->getCancellationDeadline()) {
+            throw new DomainRuleException('L\'annulation n\'est plus possible à moins de deux heures du départ.');
+        }
+
+        $this->markCancelled($at);
+    }
+
+    /** Annulation entraînée par celle du trajet : le délai du passager ne s'applique pas. */
+    public function cancelWithTrip(\DateTimeImmutable $at): void
+    {
+        $this->markCancelled($at);
+    }
+
+    private function markCancelled(\DateTimeImmutable $at): void
+    {
+        if (!$this->isConfirmed()) {
+            throw new DomainRuleException('Cette réservation est déjà annulée.');
+        }
+
+        $this->status = BookingStatus::Cancelled;
+        $this->cancelledAt = $at;
     }
 
     public function getCreatedAt(): \DateTimeImmutable
@@ -199,13 +223,6 @@ class Booking
     public function getCancelledAt(): ?\DateTimeImmutable
     {
         return $this->cancelledAt;
-    }
-
-    public function setCancelledAt(?\DateTimeImmutable $cancelledAt): static
-    {
-        $this->cancelledAt = $cancelledAt;
-
-        return $this;
     }
 
     /**

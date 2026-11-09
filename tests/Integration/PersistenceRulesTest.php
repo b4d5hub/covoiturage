@@ -148,15 +148,14 @@ final class PersistenceRulesTest extends DatabaseTestCase
 
     public function testTheUtcTypeConvertsLocalDatesEvenWithoutEntityNormalisation(): void
     {
-        $trip = $this->saveTrip(TestData::trip());
-        $trip->setCancelledAt(MoroccoTime::toLocal(MoroccoTime::toUtc('2027-02-20 12:00')));
-        $trip->setCompletedAt(MoroccoTime::toLocal(MoroccoTime::toUtc('2027-03-20 12:00')));
+        $cancelled = $this->saveTrip(TestData::trip());
+        $cancelled->cancel('Motif', MoroccoTime::toLocal(MoroccoTime::toUtc('2026-11-20 12:00')));
+        $completed = $this->saveTrip(TestData::trip());
+        $completed->complete(MoroccoTime::toLocal(MoroccoTime::toUtc('2027-02-20 12:00')));
         $this->em->flush();
 
-        $row = $this->connection->fetchAssociative('SELECT cancelled_at, completed_at FROM trip WHERE id = ?', [$trip->getId()]);
-
-        self::assertSame('2027-02-20 12:00:00', $row['cancelled_at']);
-        self::assertSame('2027-03-20 11:00:00', $row['completed_at']);
+        self::assertSame('2026-11-20 11:00:00', $this->connection->fetchOne('SELECT cancelled_at FROM trip WHERE id = ?', [$cancelled->getId()]));
+        self::assertSame('2027-02-20 12:00:00', $this->connection->fetchOne('SELECT completed_at FROM trip WHERE id = ?', [$completed->getId()]));
     }
 
     public function testBookingDeadlineSurvivesReload(): void

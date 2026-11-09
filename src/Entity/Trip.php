@@ -180,11 +180,39 @@ class Trip
         return $this->status->label();
     }
 
-    public function setStatus(TripStatus $status): static
+    /** Annulation par le conducteur, possible uniquement avant le début du trajet. */
+    public function cancel(string $reason, \DateTimeImmutable $at): void
     {
-        $this->status = $status;
+        if (TripStatus::Published !== $this->status) {
+            throw new DomainRuleException('Seul un trajet publié peut être annulé.');
+        }
 
-        return $this;
+        if ('' === trim($reason)) {
+            throw new DomainRuleException('Le motif d\'annulation est obligatoire.');
+        }
+
+        if ($at >= $this->getDepartureAt()) {
+            throw new DomainRuleException('Un trajet déjà commencé ne peut pas être annulé.');
+        }
+
+        $this->status = TripStatus::Cancelled;
+        $this->cancellationReason = trim($reason);
+        $this->cancelledAt = $at;
+    }
+
+    /** Un trajet ne peut être marqué effectué qu'après l'heure d'arrivée prévue à la dernière étape. */
+    public function complete(\DateTimeImmutable $at): void
+    {
+        if (TripStatus::Published !== $this->status) {
+            throw new DomainRuleException('Seul un trajet publié peut être marqué comme effectué.');
+        }
+
+        if ($at < $this->getStopAt($this->stops->count() - 1)->getArrivalAt()) {
+            throw new DomainRuleException('Un trajet ne peut pas être marqué comme effectué avant son arrivée prévue.');
+        }
+
+        $this->status = TripStatus::Completed;
+        $this->completedAt = $at;
     }
 
     public function getItineraryFrozenAt(): ?\DateTimeImmutable
@@ -208,35 +236,14 @@ class Trip
         return $this->cancellationReason;
     }
 
-    public function setCancellationReason(?string $cancellationReason): static
-    {
-        $this->cancellationReason = $cancellationReason;
-
-        return $this;
-    }
-
     public function getCancelledAt(): ?\DateTimeImmutable
     {
         return $this->cancelledAt;
     }
 
-    public function setCancelledAt(?\DateTimeImmutable $cancelledAt): static
-    {
-        $this->cancelledAt = $cancelledAt;
-
-        return $this;
-    }
-
     public function getCompletedAt(): ?\DateTimeImmutable
     {
         return $this->completedAt;
-    }
-
-    public function setCompletedAt(?\DateTimeImmutable $completedAt): static
-    {
-        $this->completedAt = $completedAt;
-
-        return $this;
     }
 
     public function getCreatedAt(): \DateTimeImmutable

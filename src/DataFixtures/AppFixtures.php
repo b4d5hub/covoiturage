@@ -4,17 +4,13 @@ namespace App\DataFixtures;
 
 use App\Entity\Booking;
 use App\Entity\City;
-use App\Entity\Notification;
-use App\Entity\Payment;
-use App\Entity\Review;
 use App\Entity\Trip;
 use App\Entity\TripStop;
 use App\Entity\User;
 use App\Entity\Vehicle;
-use App\Enum\BookingStatus;
-use App\Enum\PaymentStatus;
-use App\Enum\TripStatus;
-use App\Service\PortionPricing;
+use App\Service\BookingService;
+use App\Service\ReviewService;
+use App\Service\TripLifecycleService;
 use App\Time\MoroccoTime;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
@@ -53,7 +49,9 @@ final class AppFixtures extends Fixture
 
     public function __construct(
         private readonly UserPasswordHasherInterface $hasher,
-        private readonly PortionPricing $pricing,
+        private readonly BookingService $bookings,
+        private readonly TripLifecycleService $trips,
+        private readonly ReviewService $reviews,
         #[Autowire(env: 'DEMO_PASSWORD')]
         private readonly string $demoPassword,
     ) {
@@ -77,9 +75,9 @@ final class AppFixtures extends Fixture
             ['Marrakech', 3, '12:30', '13:00'],
             ['Casablanca', 3, '15:45', null],
         ], [173, 190, 240]);
-        $this->book($manager, $trip, 'amine', 0, 1, 1, -2);
-        $this->book($manager, $trip, 'nadia', 1, 3, 2, -2);
-        $this->book($manager, $trip, 'zineb', 2, 3, 1, -1);
+        $this->book($trip, 'amine', 0, 1, 1, -2);
+        $this->book($trip, 'nadia', 1, 3, 2, -2);
+        $this->book($trip, 'zineb', 2, 3, 1, -1);
 
         // Trajet à venir : une réservation complète, une partielle, une annulée par le passager.
         $trip = $this->trip($manager, $lodgy, 5, 240, [
@@ -88,9 +86,9 @@ final class AppFixtures extends Fixture
             ['Meknès', 5, '11:15', '11:30'],
             ['Fès', 5, '12:30', null],
         ], [90, 140, 65]);
-        $this->book($manager, $trip, 'hamza', 0, 3, 2, -3);
-        $this->book($manager, $trip, 'imane', 1, 2, 1, -2);
-        $this->cancelByPassenger($this->book($manager, $trip, 'mehdi', 0, 1, 1, -3), -1);
+        $this->book($trip, 'hamza', 0, 3, 2, -3);
+        $this->book($trip, 'imane', 1, 2, 1, -2);
+        $this->cancelByPassenger($this->book($trip, 'mehdi', 0, 1, 1, -3), -1);
 
         // Trajets à venir sans réservation : itinéraire encore modifiable.
         $this->trip($manager, $octavia, 3, 180, [
@@ -108,55 +106,53 @@ final class AppFixtures extends Fixture
             ['Rabat', 9, '09:15', '09:30'],
             ['Casablanca', 9, '10:45', null],
         ], [250, 90]);
-        $this->book($manager, $trip, 'salma', 1, 2, 1, -1);
+        $this->book($trip, 'salma', 1, 2, 1, -1);
 
         // Trajet annulé par le conducteur.
         $trip = $this->trip($manager, $kangoo, 3, 150, [
             ['Fès', 6, null, '09:00'],
             ['Rabat', 6, '12:00', null],
         ], [200]);
-        $cancelled = [
-            $this->book($manager, $trip, 'amine', 0, 1, 1, -4),
-            $this->book($manager, $trip, 'imane', 0, 1, 2, -3),
-        ];
-        $this->cancelByDriver($manager, $trip, $cancelled, 'Véhicule immobilisé pour réparation.', -1);
+        $this->book($trip, 'amine', 0, 1, 1, -4);
+        $this->book($trip, 'imane', 0, 1, 2, -3);
+        $this->cancelByDriver($trip, 'Véhicule immobilisé pour réparation.', -1);
 
         // Trajets effectués, avec des avis dans les deux sens.
         $trip = $this->trip($manager, $logan, 3, 140, [
             ['Marrakech', -10, null, '08:00'],
             ['Casablanca', -10, '10:45', null],
         ], [240]);
-        $this->book($manager, $trip, 'nadia', 0, 1, 1, -14);
-        $this->book($manager, $trip, 'hamza', 0, 1, 2, -13);
-        $this->complete($trip, -10);
-        $this->review($manager, $trip, 'nadia', 'youssef', 5, 'Conducteur ponctuel et très prudent.', -9);
-        $this->review($manager, $trip, 'youssef', 'nadia', 5, 'Passagère agréable, à l\'heure au rendez-vous.', -9);
-        $this->review($manager, $trip, 'hamza', 'youssef', 4, 'Bon trajet, un peu de retard au départ.', -8);
+        $this->book($trip, 'nadia', 0, 1, 1, -14);
+        $this->book($trip, 'hamza', 0, 1, 2, -13);
+        $this->complete($trip);
+        $this->review($trip, 'nadia', 'youssef', 5, 'Conducteur ponctuel et très prudent.', -9);
+        $this->review($trip, 'youssef', 'nadia', 5, 'Passagère agréable, à l\'heure au rendez-vous.', -9);
+        $this->review($trip, 'hamza', 'youssef', 4, 'Bon trajet, un peu de retard au départ.', -8);
 
         $trip = $this->trip($manager, $lodgy, 4, 70, [
             ['Agadir', -5, null, '17:00'],
             ['Taroudant', -5, '18:15', null],
         ], [80]);
-        $this->book($manager, $trip, 'zineb', 0, 1, 1, -8);
-        $this->book($manager, $trip, 'mehdi', 0, 1, 1, -7);
-        $this->complete($trip, -5);
-        $this->review($manager, $trip, 'zineb', 'khadija', 5, 'Voiture confortable, je recommande.', -4);
-        $this->review($manager, $trip, 'khadija', 'zineb', 4, null, -4);
+        $this->book($trip, 'zineb', 0, 1, 1, -8);
+        $this->book($trip, 'mehdi', 0, 1, 1, -7);
+        $this->complete($trip);
+        $this->review($trip, 'zineb', 'khadija', 5, 'Voiture confortable, je recommande.', -4);
+        $this->review($trip, 'khadija', 'zineb', 4, null, -4);
 
         $trip = $this->trip($manager, $octavia, 3, 195, [
             ['Marrakech', -20, null, '07:30'],
             ['Béni Mellal', -20, '10:15', null],
         ], [195]);
-        $this->book($manager, $trip, 'amine', 0, 1, 1, -24);
-        $this->complete($trip, -20);
-        $this->review($manager, $trip, 'amine', 'omar', 3, 'Trajet correct.', -18);
+        $this->book($trip, 'amine', 0, 1, 1, -24);
+        $this->complete($trip);
+        $this->review($trip, 'amine', 'omar', 3, 'Trajet correct.', -18);
 
         // Trajet passé, pas encore marqué comme effectué par le conducteur.
         $trip = $this->trip($manager, $kangoo, 3, 60, [
             ['Rabat', -1, null, '08:00'],
             ['Casablanca', -1, '09:15', null],
         ], [90]);
-        $this->book($manager, $trip, 'imane', 0, 1, 1, -3);
+        $this->book($trip, 'imane', 0, 1, 1, -3);
 
         $manager->flush();
     }
@@ -245,87 +241,48 @@ final class AppFixtures extends Fixture
         );
 
         $manager->persist($trip);
+        $manager->flush();
 
         return $trip;
     }
 
-    private function book(ObjectManager $manager, Trip $trip, string $passenger, int $boarding, int $alighting, int $seats, int $daysAgoFromDeparture): Booking
+    private function book(Trip $trip, string $passenger, int $boarding, int $alighting, int $seats, int $daysFromDeparture): Booking
     {
         $boardingStop = $trip->getStopAt($boarding);
-        $alightingStop = $trip->getStopAt($alighting);
-        $seatPrice = $this->pricing->seatPriceCents($trip, $boardingStop, $alightingStop);
-        $bookedAt = $boardingStop->getDepartureAt()->modify($daysAgoFromDeparture.' days');
 
-        $booking = (new Booking())
-            ->setTrip($trip)
-            ->setPassenger($this->users[$passenger])
-            ->setBoardingStop($boardingStop)
-            ->setAlightingStop($alightingStop)
-            ->setSeats($seats)
-            ->setSeatPriceCents($seatPrice)
-            ->setTotalPriceCents($seatPrice * $seats)
-            ->setCreatedAt($bookedAt);
-        $manager->persist($booking);
-        $trip->getBookings()->add($booking);
-        $trip->freezeItinerary($bookedAt);
-
-        $payment = (new Payment())
-            ->setBooking($booking)
-            ->setAmountCents($seatPrice * $seats)
-            ->setPaidAt($bookedAt);
-        $manager->persist($payment);
-        $this->payments[spl_object_id($booking)] = $payment;
-
-        return $booking;
+        return $this->bookings->book(
+            $trip,
+            $this->users[$passenger],
+            $boardingStop,
+            $trip->getStopAt($alighting),
+            $seats,
+            $boardingStop->getDepartureAt()->modify($daysFromDeparture.' days'),
+        );
     }
-
-    /** @var array<int, Payment> */
-    private array $payments = [];
 
     private function cancelByPassenger(Booking $booking, int $daysFromDeparture): void
     {
-        $cancelledAt = $booking->getBoardingStop()->getDepartureAt()->modify($daysFromDeparture.' days');
-        $this->markCancelled($booking, $cancelledAt);
+        $this->bookings->cancelByPassenger(
+            $booking,
+            $booking->getPassenger(),
+            $booking->getBoardingStop()->getDepartureAt()->modify($daysFromDeparture.' days'),
+        );
     }
 
-    /** @param list<Booking> $bookings */
-    private function cancelByDriver(ObjectManager $manager, Trip $trip, array $bookings, string $reason, int $daysFromDeparture): void
+    private function cancelByDriver(Trip $trip, string $reason, int $daysFromDeparture): void
     {
-        $cancelledAt = $trip->getDepartureAt()->modify($daysFromDeparture.' days');
-
-        $trip->setStatus(TripStatus::Cancelled)
-            ->setCancellationReason($reason)
-            ->setCancelledAt($cancelledAt);
-
-        foreach ($bookings as $booking) {
-            $this->markCancelled($booking, $cancelledAt);
-            $manager->persist((new Notification())
-                ->setRecipient($booking->getPassenger())
-                ->setMessage(\sprintf('Le trajet %s a été annulé par le conducteur : %s Votre paiement a été remboursé.', $trip, $reason)));
-        }
+        $this->trips->cancel($trip, $trip->getDriver(), $reason, $trip->getDepartureAt()->modify($daysFromDeparture.' days'));
     }
 
-    private function markCancelled(Booking $booking, \DateTimeImmutable $at): void
-    {
-        $booking->setStatus(BookingStatus::Cancelled)->setCancelledAt($at);
-        $this->payments[spl_object_id($booking)]->setStatus(PaymentStatus::Refunded)->setRefundedAt($at);
-    }
-
-    private function complete(Trip $trip, int $days): void
+    private function complete(Trip $trip): void
     {
         $lastStop = $trip->getStopAt($trip->getStops()->count() - 1);
-        $trip->setStatus(TripStatus::Completed)->setCompletedAt($lastStop->getArrivalAt()->modify('+1 hour'));
+        $this->trips->complete($trip, $trip->getDriver(), $lastStop->getArrivalAt()->modify('+1 hour'));
     }
 
-    private function review(ObjectManager $manager, Trip $trip, string $author, string $target, int $rating, ?string $comment, int $days): void
+    private function review(Trip $trip, string $author, string $target, int $rating, ?string $comment, int $days): void
     {
-        $manager->persist((new Review())
-            ->setTrip($trip)
-            ->setAuthor($this->users[$author])
-            ->setTarget($this->users[$target])
-            ->setRating($rating)
-            ->setComment($comment)
-            ->setCreatedAt($this->localDate($days, '12:00')));
+        $this->reviews->submit($trip, $this->users[$author], $this->users[$target], $rating, $comment, $this->localDate($days, '12:00'));
     }
 
     private function localDate(int $days, string $time): \DateTimeImmutable

@@ -4,8 +4,11 @@ namespace App\Repository;
 
 use App\Entity\Booking;
 use App\Entity\Trip;
+use App\Entity\User;
 use App\Enum\BookingStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\LockMode;
+use Doctrine\ORM\Query;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -55,6 +58,29 @@ class BookingRepository extends ServiceEntityRepository
         }
 
         return $occupied;
+    }
+
+    /** Lecture verrouillante, à appeler sous le verrou du trajet. */
+    public function hasConfirmedBooking(Trip $trip, User $passenger): bool
+    {
+        return (int) $this->getEntityManager()->getConnection()->fetchOne(
+            'SELECT COUNT(*) FROM booking WHERE trip_id = :trip AND passenger_id = :passenger AND status = :confirmed FOR SHARE',
+            ['trip' => $trip->getId(), 'passenger' => $passenger->getId(), 'confirmed' => BookingStatus::Confirmed->value],
+        ) > 0;
+    }
+
+    /** @return list<Booking> réservations confirmées du trajet, relues et verrouillées */
+    public function findConfirmedForUpdate(Trip $trip): array
+    {
+        return $this->createQueryBuilder('b')
+            ->andWhere('b.trip = :trip')
+            ->andWhere('b.status = :confirmed')
+            ->setParameter('trip', $trip)
+            ->setParameter('confirmed', BookingStatus::Confirmed)
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getResult();
     }
 
     /** Occupation maximale parmi les segments du trajet. */

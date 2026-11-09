@@ -53,7 +53,7 @@ final class OccupancyAndCapacityTest extends DatabaseTestCase
     {
         $trip = $this->saveTrip(TestData::trip());
         $booking = $this->book($trip, 0, 2, 2);
-        $booking->setStatus(BookingStatus::Cancelled);
+        $booking->cancelByPassenger(new \DateTimeImmutable('2026-11-01'));
         $this->em->flush();
 
         self::assertSame([0 => 0, 1 => 0], $this->bookings->occupiedSeatsBySegment($trip));
