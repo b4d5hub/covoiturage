@@ -71,6 +71,11 @@ class Payment
         return $this->status;
     }
 
+    public function getStatusLabel(): string
+    {
+        return $this->status->label();
+    }
+
     public function setStatus(PaymentStatus $status): static
     {
         $this->status = $status;

@@ -73,6 +73,11 @@ class Booking
         $this->createdAt = new \DateTimeImmutable();
     }
 
+    public function __toString(): string
+    {
+        return "Réservation n°".$this->id;
+    }
+
     public function getId(): ?int
     {
         return $this->id;
@@ -165,6 +170,11 @@ class Booking
     public function getStatus(): BookingStatus
     {
         return $this->status;
+    }
+
+    public function getStatusLabel(): string
+    {
+        return $this->status->label();
     }
 
     public function setStatus(BookingStatus $status): static

@@ -170,6 +170,16 @@ class Trip
         return $this->status;
     }
 
+    public function getRouteLabel(): string
+    {
+        return (string) $this;
+    }
+
+    public function getStatusLabel(): string
+    {
+        return $this->status->label();
+    }
+
     public function setStatus(TripStatus $status): static
     {
         $this->status = $status;
@@ -238,6 +248,12 @@ class Trip
     public function getStops(): Collection
     {
         return $this->stops;
+    }
+
+    /** Départ du trajet : heure de départ de la première étape. */
+    public function getDepartureAt(): ?\DateTimeImmutable
+    {
+        return $this->getStopAt(0)?->getDepartureAt();
     }
 
     public function getStopAt(int $position): ?TripStop
@@ -316,7 +332,7 @@ class Trip
         }
 
         foreach ($distancesMeters as $position => $distance) {
-            $existing = $this->findSegmentAt($position);
+            $existing = $this->getSegmentAt($position);
 
             if (null !== $existing) {
                 $existing->changeDistance($distance);
@@ -332,7 +348,7 @@ class Trip
         }
     }
 
-    private function findSegmentAt(int $position): ?TripSegment
+    public function getSegmentAt(int $position): ?TripSegment
     {
         foreach ($this->segments as $segment) {
             if ($segment->getPosition() === $position) {
