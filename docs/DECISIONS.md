@@ -28,7 +28,7 @@ Le montant total est le prix d'une place multiplié par le nombre de places rés
 - Le prix d'une place est arrondi au centime le plus proche, puis multiplié par le nombre de places. De légers écarts d'arrondi entre des portions réservées séparément sont acceptés.
 - Le montant final est enregistré sur la réservation au moment de celle-ci.
 
-*Justification :* le conducteur ne saisit qu'un prix, et le partage reste équitable et explicable au passager. Le calcul entier et l'arrondi unique rendent le résultat déterministe et testable.
+*Justification :* la règle est simple, car le conducteur ne saisit qu'un seul prix. Elle est cohérente, car la même formule s'applique à toutes les portions d'un trajet. Elle est transparente, car le passager peut retrouver son prix à partir des distances. Le calcul entier et l'arrondi unique rendent le résultat déterministe et testable.
 
 #### Que se passe-t-il quand le conducteur modifie un horaire ou supprime une étape après des réservations ?
 
@@ -41,7 +41,7 @@ Le montant total est le prix d'une place multiplié par le nombre de places rés
 
 Pour changer l'itinéraire, le conducteur annule le trajet et en publie un nouveau. Les exceptions décrites plus bas (capacité et prix) restent possibles, car elles ne touchent pas à l'itinéraire.
 
-*Justification :* un passager réserve sur la base d'un horaire, d'un lieu et d'un prix dérivé des distances. Un gel simple et sans cas particulier garantit que ces engagements restent valables.
+*Justification :* un passager réserve sur la base d'un horaire, d'un lieu et d'un prix dérivé des distances, et le gel garantit que ces engagements restent valables. Il est permanent afin de préserver aussi la cohérence de l'historique : une réservation, même annulée, continue de se rapporter aux étapes, aux horaires et aux distances sur lesquels son montant a été calculé. La capacité et le prix complet restent modifiables dans les limites décrites plus bas, car ils ne changent pas l'itinéraire.
 
 #### Un passager peut-il réserver plusieurs places en une fois ?
 
@@ -53,7 +53,7 @@ Pour changer l'itinéraire, le conducteur annule le trajet et en publie un nouve
 
 Le passager et le conducteur se notent **mutuellement**. Il n'y a pas d'avis entre passagers. Un avis n'est possible qu'après un trajet effectué, dans un délai de 14 jours, à raison d'un avis par sens et par trajet.
 
-*Justification :* seule la relation conducteur–passager repose sur un service rendu. Le délai garde les avis proches du trajet concerné.
+*Justification :* seule la relation conducteur–passager repose sur un service rendu. Le délai de 14 jours laisse à chacun le temps de déposer son avis, tout en le gardant assez proche du trajet pour que le souvenir en soit fidèle. Il évite aussi qu'un avis arrive très longtemps après les faits, et se vérifie par une simple comparaison de dates.
 
 ### Autres règles métier
 
@@ -69,7 +69,7 @@ Le passager et le conducteur se notent **mutuellement**. Il n'y a pas d'avis ent
 | Étapes | Une étape comprend une ville, une position ordonnée, l'adresse précise du point de rendez-vous, des coordonnées géographiques et les horaires prévus d'arrivée et/ou de départ. La recherche utilise les villes ; la carte et l'itinéraire utilisent les coordonnées. |
 | Villes | Le conducteur choisit dans une liste gérée depuis le back-office. |
 | Notifications | Entité simple : destinataire, message, date de création, état de lecture. Affichées dans l'espace passager, sans e-mail. |
-| Données de démonstration | Points de rendez-vous publics uniquement (gares routières, etc.), aucune adresse privée ni donnée personnelle. Coordonnées et distances valides. |
+| Données de démonstration | Points de rendez-vous publics uniquement (gares routières, etc.), aucune adresse privée. Aucune donnée personnelle réelle : les profils de démonstration sont fictifs. Coordonnées et distances valides. |
 | Conventions | Montants en MAD, fuseau horaire `Africa/Casablanca`. |
 
 ### Prévention des surréservations
@@ -77,7 +77,7 @@ Le passager et le conducteur se notent **mutuellement**. Il n'y a pas d'avis ent
 Toute réservation s'effectue dans **une seule transaction** :
 
 1. verrouillage de la ligne du trajet ;
-2. calcul de l'occupation de chaque segment demandé, à partir des réservations confirmées ;
+2. calcul de l'occupation de chaque segment demandé, à partir de l'état validé le plus récent des réservations confirmées ;
 3. vérification que chaque segment dispose d'assez de places ;
 4. création de la réservation ;
 5. validation de la transaction.
@@ -86,7 +86,12 @@ Les opérations qui modifient l'occupation ou la capacité appliquent le même v
 
 Les contraintes `CHECK` servent uniquement aux validations simples sur une ligne, comme une quantité de places positive. Elles ne peuvent pas garantir à elles seules une disponibilité agrégée sur plusieurs réservations : c'est le verrouillage transactionnel et le contrôle de capacité qui empêchent la surréservation.
 
-*Justification :* verrouiller le trajet sérialise les opérations concurrentes sur ce trajet seulement, sans risque d'interblocage entre segments. Calculer l'occupation depuis les réservations évite un compteur susceptible de diverger.
+**Lecture de l'occupation après verrouillage.** Avec l'isolation par défaut d'InnoDB (`REPEATABLE READ`), un `SELECT` ordinaire lit l'instantané établi par la première lecture cohérente de la transaction. Si une telle lecture a lieu avant l'obtention du verrou, le calcul peut ignorer une réservation validée pendant l'attente de ce verrou. La requête d'occupation doit donc lire l'état validé le plus récent une fois le verrou obtenu :
+
+- elle est exécutée comme une lecture verrouillante (`FOR SHARE`), qui ne dépend pas de l'instantané ;
+- c'est une requête d'agrégation envoyée à la base, jamais un calcul sur des entités déjà chargées en mémoire par Doctrine.
+
+*Justification :* verrouiller le trajet sérialise les opérations concurrentes sur ce trajet seulement et simplifie le contrôle de la concurrence : un seul verrou à prendre, toujours en premier, plutôt qu'un verrou par segment. Cela réduit le risque d'interblocage sans l'éliminer, car d'autres verrous peuvent intervenir dans la transaction ; en cas d'interblocage, InnoDB annule une transaction, sans effet partiel. Calculer l'occupation depuis les réservations évite un compteur susceptible de diverger.
 
 ### Intégrations externes (niveau 4)
 
