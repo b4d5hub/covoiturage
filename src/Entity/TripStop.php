@@ -7,6 +7,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 /**
  * Étape d'un trajet : la ville sert à la recherche, les coordonnées à la carte et à l'itinéraire.
+ * Une étape ne se modifie que par Trip::replaceItinerary(), qui maintient la cohérence de l'itinéraire.
  */
 #[ORM\Entity]
 #[ORM\UniqueConstraint(name: 'uniq_trip_stop_position', columns: ['trip_id', 'position'])]
@@ -24,39 +25,69 @@ class TripStop
 
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: false)]
-    #[Assert\NotNull]
-    private ?City $city = null;
+    private City $city;
 
     /** Rang de l'étape dans le trajet, à partir de 0. */
     #[ORM\Column]
-    #[Assert\PositiveOrZero]
-    private ?int $position = null;
+    private int $position = 0;
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank]
-    private ?string $meetingAddress = null;
+    private string $meetingAddress;
 
     #[ORM\Column(type: 'decimal', precision: 9, scale: 6)]
-    #[Assert\NotBlank]
     #[Assert\Range(min: -90, max: 90)]
-    private ?string $latitude = null;
+    private string $latitude;
 
     #[ORM\Column(type: 'decimal', precision: 9, scale: 6)]
-    #[Assert\NotBlank]
     #[Assert\Range(min: -180, max: 180)]
-    private ?string $longitude = null;
+    private string $longitude;
 
-    /** Absente pour la première étape. */
+    /** En UTC. Absente pour la première étape. */
     #[ORM\Column(nullable: true)]
-    private ?\DateTimeImmutable $arrivalAt = null;
+    private ?\DateTimeImmutable $arrivalAt;
 
-    /** Absente pour la dernière étape. */
+    /** En UTC. Absente pour la dernière étape. */
     #[ORM\Column(nullable: true)]
-    private ?\DateTimeImmutable $departureAt = null;
+    private ?\DateTimeImmutable $departureAt;
+
+    public function __construct(
+        City $city,
+        string $meetingAddress,
+        string $latitude,
+        string $longitude,
+        ?\DateTimeImmutable $arrivalAt,
+        ?\DateTimeImmutable $departureAt,
+    ) {
+        $this->city = $city;
+        $this->meetingAddress = $meetingAddress;
+        $this->latitude = $latitude;
+        $this->longitude = $longitude;
+        $this->arrivalAt = $arrivalAt?->setTimezone(new \DateTimeZone('UTC'));
+        $this->departureAt = $departureAt?->setTimezone(new \DateTimeZone('UTC'));
+    }
 
     public function __toString(): string
     {
         return $this->city.' – '.$this->meetingAddress;
+    }
+
+    /** @internal Appelée uniquement par Trip::replaceItinerary(). */
+    public function attachTo(Trip $trip, int $position): void
+    {
+        $this->trip = $trip;
+        $this->position = $position;
+    }
+
+    /** @internal Appelée uniquement par Trip::replaceItinerary(). */
+    public function copyDetailsFrom(self $other): void
+    {
+        $this->city = $other->city;
+        $this->meetingAddress = $other->meetingAddress;
+        $this->latitude = $other->latitude;
+        $this->longitude = $other->longitude;
+        $this->arrivalAt = $other->arrivalAt;
+        $this->departureAt = $other->departureAt;
     }
 
     public function getId(): ?int
@@ -69,71 +100,29 @@ class TripStop
         return $this->trip;
     }
 
-    public function setTrip(Trip $trip): static
-    {
-        $this->trip = $trip;
-
-        return $this;
-    }
-
-    public function getCity(): ?City
+    public function getCity(): City
     {
         return $this->city;
     }
 
-    public function setCity(City $city): static
-    {
-        $this->city = $city;
-
-        return $this;
-    }
-
-    public function getPosition(): ?int
+    public function getPosition(): int
     {
         return $this->position;
     }
 
-    public function setPosition(int $position): static
-    {
-        $this->position = $position;
-
-        return $this;
-    }
-
-    public function getMeetingAddress(): ?string
+    public function getMeetingAddress(): string
     {
         return $this->meetingAddress;
     }
 
-    public function setMeetingAddress(string $meetingAddress): static
-    {
-        $this->meetingAddress = $meetingAddress;
-
-        return $this;
-    }
-
-    public function getLatitude(): ?string
+    public function getLatitude(): string
     {
         return $this->latitude;
     }
 
-    public function setLatitude(string $latitude): static
-    {
-        $this->latitude = $latitude;
-
-        return $this;
-    }
-
-    public function getLongitude(): ?string
+    public function getLongitude(): string
     {
         return $this->longitude;
-    }
-
-    public function setLongitude(string $longitude): static
-    {
-        $this->longitude = $longitude;
-
-        return $this;
     }
 
     public function getArrivalAt(): ?\DateTimeImmutable
@@ -141,22 +130,8 @@ class TripStop
         return $this->arrivalAt;
     }
 
-    public function setArrivalAt(?\DateTimeImmutable $arrivalAt): static
-    {
-        $this->arrivalAt = $arrivalAt;
-
-        return $this;
-    }
-
     public function getDepartureAt(): ?\DateTimeImmutable
     {
         return $this->departureAt;
-    }
-
-    public function setDepartureAt(?\DateTimeImmutable $departureAt): static
-    {
-        $this->departureAt = $departureAt;
-
-        return $this;
     }
 }

@@ -3,16 +3,23 @@
 namespace App\Entity;
 
 use App\Enum\BookingStatus;
+use App\Exception\DomainRuleException;
+use App\Repository\BookingRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 /**
  * Réservation d'une ou plusieurs places sur une portion de trajet.
  * Les montants sont figés à la réservation.
  */
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: BookingRepository::class)]
+#[ORM\HasLifecycleCallbacks]
 class Booking
 {
+    /** Délai minimal avant le départ de l'étape de montée pour annuler. */
+    private const CANCELLATION_NOTICE = '-2 hours';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -189,5 +196,56 @@ class Booking
         $this->cancelledAt = $cancelledAt;
 
         return $this;
+    }
+
+    /**
+     * Dernier instant d'annulation par le passager. Le calcul se fait en UTC :
+     * les deux heures restent deux heures réelles lors d'un changement d'heure au Maroc.
+     */
+    public function getCancellationDeadline(): \DateTimeImmutable
+    {
+        return $this->boardingStop->getDepartureAt()
+            ->setTimezone(new \DateTimeZone('UTC'))
+            ->modify(self::CANCELLATION_NOTICE);
+    }
+
+    /** @return list<string> */
+    private function routeViolations(): array
+    {
+        if (null === $this->trip || null === $this->boardingStop || null === $this->alightingStop) {
+            return [];
+        }
+
+        if ($this->boardingStop->getTrip() !== $this->trip) {
+            return ['L\'étape de montée doit appartenir au trajet réservé.'];
+        }
+
+        if ($this->alightingStop->getTrip() !== $this->trip) {
+            return ['L\'étape de descente doit appartenir au trajet réservé.'];
+        }
+
+        if ($this->boardingStop->getPosition() >= $this->alightingStop->getPosition()) {
+            return ['L\'étape de montée doit précéder l\'étape de descente.'];
+        }
+
+        return [];
+    }
+
+    #[Assert\Callback]
+    public function validateRoute(ExecutionContextInterface $context): void
+    {
+        foreach ($this->routeViolations() as $message) {
+            $context->addViolation($message);
+        }
+    }
+
+    /** Dernier garde-fou : s'applique à tout chemin d'écriture passant par Doctrine. */
+    #[ORM\PrePersist]
+    #[ORM\PreUpdate]
+    public function assertRouteIsValid(): void
+    {
+        foreach ($this->routeViolations() as $message) {
+            throw new DomainRuleException($message);
+        }
     }
 }

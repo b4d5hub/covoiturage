@@ -2,8 +2,8 @@
 
 namespace App\Entity;
 
+use App\Exception\DomainRuleException;
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Validator\Constraints as Assert;
 
 /**
  * Tronçon entre deux étapes consécutives : unité de calcul des places et du prix.
@@ -20,89 +20,59 @@ class TripSegment
 
     #[ORM\ManyToOne(inversedBy: 'segments')]
     #[ORM\JoinColumn(nullable: false)]
-    private ?Trip $trip = null;
-
-    #[ORM\ManyToOne]
-    #[ORM\JoinColumn(nullable: false)]
-    #[Assert\NotNull]
-    private ?TripStop $fromStop = null;
-
-    #[ORM\ManyToOne]
-    #[ORM\JoinColumn(nullable: false)]
-    #[Assert\NotNull]
-    private ?TripStop $toStop = null;
+    private Trip $trip;
 
     #[ORM\Column]
-    #[Assert\PositiveOrZero]
-    private ?int $position = null;
+    private int $position;
 
     /** Distance routière en mètres entiers. */
     #[ORM\Column]
-    #[Assert\Positive]
-    private ?int $distanceMeters = null;
+    private int $distanceMeters;
+
+    public function __construct(Trip $trip, int $position, int $distanceMeters)
+    {
+        $this->trip = $trip;
+        $this->position = $position;
+        $this->changeDistance($distanceMeters);
+    }
+
+    /** @internal Appelée uniquement par Trip::replaceItinerary(). */
+    public function changeDistance(int $distanceMeters): void
+    {
+        if ($distanceMeters <= 0) {
+            throw new DomainRuleException('La distance d\'un segment doit être strictement positive.');
+        }
+
+        $this->distanceMeters = $distanceMeters;
+    }
 
     public function getId(): ?int
     {
         return $this->id;
     }
 
-    public function getTrip(): ?Trip
+    public function getTrip(): Trip
     {
         return $this->trip;
     }
 
-    public function setTrip(Trip $trip): static
-    {
-        $this->trip = $trip;
-
-        return $this;
-    }
-
-    public function getFromStop(): ?TripStop
-    {
-        return $this->fromStop;
-    }
-
-    public function setFromStop(TripStop $fromStop): static
-    {
-        $this->fromStop = $fromStop;
-
-        return $this;
-    }
-
-    public function getToStop(): ?TripStop
-    {
-        return $this->toStop;
-    }
-
-    public function setToStop(TripStop $toStop): static
-    {
-        $this->toStop = $toStop;
-
-        return $this;
-    }
-
-    public function getPosition(): ?int
+    public function getPosition(): int
     {
         return $this->position;
     }
 
-    public function setPosition(int $position): static
+    public function getFromStop(): ?TripStop
     {
-        $this->position = $position;
-
-        return $this;
+        return $this->trip->getStopAt($this->position);
     }
 
-    public function getDistanceMeters(): ?int
+    public function getToStop(): ?TripStop
+    {
+        return $this->trip->getStopAt($this->position + 1);
+    }
+
+    public function getDistanceMeters(): int
     {
         return $this->distanceMeters;
-    }
-
-    public function setDistanceMeters(int $distanceMeters): static
-    {
-        $this->distanceMeters = $distanceMeters;
-
-        return $this;
     }
 }
