@@ -1,0 +1,9 @@
+twig:
+    file_name_pattern: '*.twig'
+    # Les dates sont stockées en UTC et affichées à l'heure du Maroc.
+    date:
+        timezone: Africa/Casablanca
+
+when@test:
+    twig:
+        strict_variables: true
