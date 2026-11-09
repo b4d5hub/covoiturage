@@ -34,6 +34,9 @@ when@test:
         dbal:
             # "TEST_TOKEN" is typically set by ParaTest
             dbname_suffix: '_test%env(default::TEST_TOKEN)%'
+        orm:
+            # Les tests de concurrence chargent les mêmes classes depuis plusieurs processus.
+            auto_generate_proxy_classes: FILE_NOT_EXISTS
 
 when@prod:
     doctrine:
