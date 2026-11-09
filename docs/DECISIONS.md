@@ -130,3 +130,17 @@ Un audit du modèle a montré que plusieurs conditions étaient supposées sans 
 | Conducteur historique | Pas de colonne `trip.driver_id`. Le propriétaire d'un véhicule utilisé par un trajet et le véhicule d'un trajet existant ne peuvent plus changer. | Le conducteur reste déductible du véhicule sans donnée dupliquée. |
 | Capacité | Strictement positive, au plus égale aux places du véhicule, jamais inférieure à l'occupation. Les places d'un véhicule ne peuvent pas descendre sous la capacité d'un trajet qui l'utilise, y compris un trajet passé. | La règle reste vraie pour tous les trajets, sans cas particulier selon leur état. |
 | Gel de l'itinéraire | Opération à sens unique : aucune méthode ne permet de l'annuler. | Le gel est définitif par décision du projet. |
+
+---
+
+## 2026-11-09 — Back-office et données de démonstration
+
+| Sujet | Décision | Justification |
+|---|---|---|
+| Outil | EasyAdmin, réservé au rôle administrateur, derrière un formulaire de connexion. | Couvre la gestion des objets sans développer d'écrans sur mesure. |
+| Objets modifiables | Comptes, villes, véhicules et trajets. | Leurs règles sont déjà appliquées par les entités. |
+| Objets en consultation seule | Réservations, paiements, avis et notifications. | Ils ne doivent changer que par les règles métier (verrou, paiement simulé, annulations) ; les modifier à la main contournerait ces règles. |
+| Trajets | L'itinéraire passe par `Trip::replaceItinerary()`, la capacité d'un trajet enregistré par le service sous verrou. Pas de suppression ; l'état n'est pas modifiable à la main. | Le back-office applique les mêmes contrôles que le reste de l'application. |
+| Saisie des prix | Montant en MAD converti en centimes par analyse du texte, sans nombre flottant. | Le champ monétaire d'EasyAdmin passe par un nombre flottant. |
+| Données de démonstration | Personnes fictives, adresses `@covoiturage.test`, points de rendez-vous publics, coordonnées approximatives et distances arrondies. Dates relatives au jour du chargement. | La démonstration reste à jour sans donnée réelle. |
+| Mot de passe de démonstration | Commun aux comptes fictifs et lu depuis la variable `DEMO_PASSWORD`, dont la valeur figure dans `.env.example`. | Le sujet demande de documenter des comptes de démonstration. Cette valeur ne protège aucune donnée réelle. |

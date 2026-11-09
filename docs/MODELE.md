@@ -104,7 +104,8 @@ Ces règles portent sur plusieurs lignes. Elles sont contrôlées par les entit�
 - rangs d'étapes et de segments consécutifs, N − 1 segments, distances positives, horaires cohérents ;
 - modification de l'itinéraire uniquement par `Trip::replaceItinerary()`, refusée une fois le trajet gelé ;
 - propriétaire du véhicule et véhicule du trajet fixes, dans les conditions décrites plus haut ;
-- capacité strictement positive, au plus égale aux places du véhicule, et jamais inférieure à l'occupation.
+- capacité strictement positive, au plus égale aux places du véhicule, et jamais inférieure à l'occupation ;
+- calcul du prix d'une portion, proportionnel à la distance.
 
 **Prévues au niveau 2, pas encore implémentées**
 
