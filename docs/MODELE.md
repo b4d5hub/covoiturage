@@ -38,7 +38,7 @@ Cette vue montre les entités et leurs liens principaux. Les liens entre étapes
 | Réservation | `Booking`, `Payment` | Réservation d'une portion de trajet et paiement simulé associé. |
 | Après le trajet | `Review`, `Notification` | Avis entre passagers et conducteurs ; messages dans l'espace passager. |
 
-**Lecture des liens :** `||` exactement un, `o{` zéro ou plusieurs, `|{` un ou plusieurs.
+**Lecture des liens :** deux traits pour exactement un ; un cercle et une patte d'oie pour zéro ou plusieurs ; un trait et une patte d'oie pour un ou plusieurs.
 
 ---
 
