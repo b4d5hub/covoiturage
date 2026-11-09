@@ -1,0 +1,28 @@
+{% set trip = entity.instance %}
+<table class="table table-sm mb-0">
+    <thead>
+        <tr>
+            <th>Rang</th>
+            <th>Ville</th>
+            <th>Point de rendez-vous</th>
+            <th>Coordonnées</th>
+            <th>Arrivée</th>
+            <th>Départ</th>
+            <th>Vers l'étape suivante</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for stop in trip.stops %}
+            {% set segment = trip.segmentAt(stop.position) %}
+            <tr>
+                <td>{{ stop.position }}</td>
+                <td>{{ stop.city }}</td>
+                <td>{{ stop.meetingAddress }}</td>
+                <td>{{ stop.latitude }}, {{ stop.longitude }}</td>
+                <td>{{ stop.arrivalAt ? stop.arrivalAt|date('d/m/Y H:i') : '—' }}</td>
+                <td>{{ stop.departureAt ? stop.departureAt|date('d/m/Y H:i') : '—' }}</td>
+                <td>{{ segment ? (segment.distanceMeters / 1000)|number_format(1, ',', ' ') ~ ' km' : '—' }}</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
