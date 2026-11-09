@@ -2,205 +2,30 @@
 
 Ce document présente le modèle de données et explique ses choix. Les règles métier et leurs justifications figurent dans [DECISIONS.md](DECISIONS.md).
 
-**Sommaire**
+## Diagramme entité-association
 
-1. [Vue d'ensemble](#1-vue-densemble)
-2. [Diagrammes par domaine](#2-diagrammes-par-domaine)
-3. [Dictionnaire des données](#3-dictionnaire-des-données)
-4. [Choix de conception](#4-choix-de-conception)
-5. [Contraintes en base](#5-contraintes-en-base)
+![Diagramme entité-association : dix tables et leurs seize relations](modele-donnees.png)
 
----
+Le diagramme montre les dix tables, toutes leurs colonnes et leurs seize relations. Les types y sont simplifiés ; les longueurs exactes figurent dans les entités Doctrine. La source modifiable est [modele-donnees.drawio](modele-donnees.drawio).
 
-## 1. Vue d'ensemble
+## Entités
 
-```mermaid
-erDiagram
-    User ||--o{ Notification : "reçoit"
-    User ||--o{ Booking : "réserve"
-    User ||--o{ Vehicle : "possède"
-    User ||--o{ Review : "rédige, reçoit"
-    Vehicle ||--o{ Trip : "assure"
-    Trip ||--o{ Booking : "reçoit"
-    Trip ||--|{ TripSegment : "découpé en"
-    Trip ||--|{ TripStop : "passe par"
-    Trip ||--o{ Review : "évalué par"
-    Booking ||--|| Payment : "paiement"
-    TripStop }o--|| City : "située dans"
-```
+Chaque entité correspond à une table au nom en `snake_case`, à l'exception de `User`, stockée dans `app_user`.
 
-Cette vue montre les entités et leurs liens principaux. Les liens entre étapes, segments et réservations, ainsi que les attributs, sont détaillés plus bas.
-
-| Domaine | Entités | Rôle |
+| Domaine | Entité | Rôle |
 |---|---|---|
-| Comptes | `User`, `Vehicle` | Compte unique pour conducteurs et passagers ; véhicules des conducteurs. |
-| Offre | `City`, `Trip`, `TripStop`, `TripSegment` | Trajets publiés, leurs étapes et les tronçons qui les relient. |
-| Réservation | `Booking`, `Payment` | Réservation d'une portion de trajet et paiement simulé associé. |
-| Après le trajet | `Review`, `Notification` | Avis entre passagers et conducteurs ; messages dans l'espace passager. |
+| Comptes | `User` | Compte unique, avec des rôles. Une même personne peut être conducteur et passager. |
+| | `Vehicle` | Véhicule d'un conducteur et nombre de places proposables, hors conducteur. |
+| Offre | `City` | Ville de la liste gérée depuis le back-office ; sert à la recherche. |
+| | `Trip` | Trajet publié : véhicule, capacité, prix complet, état et gel de l'itinéraire. |
+| | `TripStop` | Étape : ville, rang, point de rendez-vous, coordonnées, horaires. |
+| | `TripSegment` | Tronçon entre deux étapes consécutives, avec sa distance en mètres. |
+| Réservation | `Booking` | Réservation d'une ou plusieurs places entre une étape de montée et une étape de descente. |
+| | `Payment` | Paiement simulé d'une réservation : payé, puis éventuellement remboursé. |
+| Après le trajet | `Review` | Avis dans un sens donné, pour un trajet. |
+| | `Notification` | Message affiché dans l'espace passager. |
 
-**Lecture des liens :** deux traits pour exactement un ; un cercle et une patte d'oie pour zéro ou plusieurs ; un trait et une patte d'oie pour un ou plusieurs.
-
----
-
-## 2. Diagrammes par domaine
-
-### Offre de trajets
-
-Un conducteur assure des trajets avec l'un de ses véhicules. Chaque segment relie deux étapes consécutives.
-
-```mermaid
-erDiagram
-    User ||--o{ Vehicle : "possède"
-    Vehicle ||--o{ Trip : "assure"
-    Trip ||--|{ TripStop : "passe par"
-    Trip ||--|{ TripSegment : "découpé en"
-    City ||--o{ TripStop : "situe"
-    TripStop ||--o{ TripSegment : "début"
-    TripStop ||--o{ TripSegment : "fin"
-```
-
-### Réservation et paiement
-
-Une réservation porte sur une portion définie par une étape de montée et une étape de descente.
-
-```mermaid
-erDiagram
-    User ||--o{ Booking : "réserve"
-    Trip ||--o{ Booking : "reçoit"
-    TripStop ||--o{ Booking : "montée"
-    TripStop ||--o{ Booking : "descente"
-    Booking ||--|| Payment : "paiement simulé"
-```
-
-### Avis et notifications
-
-Un avis relie un auteur et un destinataire pour un trajet donné.
-
-```mermaid
-erDiagram
-    Trip ||--o{ Review : "concerne"
-    User ||--o{ Review : "rédige"
-    User ||--o{ Review : "reçoit"
-    User ||--o{ Notification : "reçoit"
-```
-
----
-
-## 3. Dictionnaire des données
-
-Toutes les tables ont une clé primaire `id` (`INT`, auto-incrémentée). Une colonne est obligatoire sauf mention « oui » dans la colonne *Nul*.
-
-### `app_user` — entité `User`
-
-| Colonne | Type | Nul | Description |
-|---|---|---|---|
-| `email` | `VARCHAR(180)` | | Identifiant de connexion, unique |
-| `password` | `VARCHAR(255)` | | Mot de passe haché |
-| `roles` | `JSON` | | Rôles du compte |
-| `first_name` | `VARCHAR(100)` | | Prénom |
-| `last_name` | `VARCHAR(100)` | | Nom |
-| `created_at` | `DATETIME` | | Date de création |
-
-### `city` — entité `City`
-
-| Colonne | Type | Nul | Description |
-|---|---|---|---|
-| `name` | `VARCHAR(100)` | | Nom de la ville, unique |
-
-### `vehicle` — entité `Vehicle`
-
-| Colonne | Type | Nul | Description |
-|---|---|---|---|
-| `owner_id` | `INT` → `app_user` | | Propriétaire, donc conducteur |
-| `brand` | `VARCHAR(60)` | | Marque |
-| `model` | `VARCHAR(60)` | | Modèle |
-| `passenger_seats` | `INT` | | Places proposables, hors conducteur |
-
-### `trip` — entité `Trip`
-
-| Colonne | Type | Nul | Description |
-|---|---|---|---|
-| `vehicle_id` | `INT` → `vehicle` | | Véhicule utilisé |
-| `seat_capacity` | `INT` | | Places proposées sur chaque segment |
-| `full_price_cents` | `INT` | | Prix d'une place pour le trajet complet, en centimes de MAD |
-| `status` | `VARCHAR(20)` | | `published`, `completed` ou `cancelled` |
-| `itinerary_frozen_at` | `DATETIME` | oui | Date du gel de l'itinéraire |
-| `cancellation_reason` | `LONGTEXT` | oui | Motif d'annulation par le conducteur |
-| `cancelled_at` | `DATETIME` | oui | Date d'annulation |
-| `completed_at` | `DATETIME` | oui | Date à laquelle le trajet est marqué effectué |
-| `created_at` | `DATETIME` | | Date de création |
-
-### `trip_stop` — entité `TripStop`
-
-| Colonne | Type | Nul | Description |
-|---|---|---|---|
-| `trip_id` | `INT` → `trip` | | Trajet |
-| `city_id` | `INT` → `city` | | Ville, utilisée pour la recherche |
-| `position` | `INT` | | Rang dans le trajet, à partir de 0 |
-| `meeting_address` | `VARCHAR(255)` | | Adresse précise du point de rendez-vous |
-| `latitude` | `DECIMAL(9,6)` | | Latitude |
-| `longitude` | `DECIMAL(9,6)` | | Longitude |
-| `arrival_at` | `DATETIME` | oui | Arrivée prévue ; absente pour la première étape |
-| `departure_at` | `DATETIME` | oui | Départ prévu ; absent pour la dernière étape |
-
-### `trip_segment` — entité `TripSegment`
-
-| Colonne | Type | Nul | Description |
-|---|---|---|---|
-| `trip_id` | `INT` → `trip` | | Trajet |
-| `from_stop_id` | `INT` → `trip_stop` | | Étape de début |
-| `to_stop_id` | `INT` → `trip_stop` | | Étape de fin |
-| `position` | `INT` | | Rang du segment, à partir de 0 |
-| `distance_meters` | `INT` | | Distance routière en mètres |
-
-### `booking` — entité `Booking`
-
-| Colonne | Type | Nul | Description |
-|---|---|---|---|
-| `trip_id` | `INT` → `trip` | | Trajet |
-| `passenger_id` | `INT` → `app_user` | | Passager |
-| `boarding_stop_id` | `INT` → `trip_stop` | | Étape de montée |
-| `alighting_stop_id` | `INT` → `trip_stop` | | Étape de descente |
-| `seats` | `INT` | | Nombre de places |
-| `seat_price_cents` | `INT` | | Prix d'une place pour cette portion, figé à la réservation |
-| `total_price_cents` | `INT` | | Montant total, figé à la réservation |
-| `status` | `VARCHAR(20)` | | `confirmed` ou `cancelled` |
-| `created_at` | `DATETIME` | | Date de réservation |
-| `cancelled_at` | `DATETIME` | oui | Date d'annulation |
-
-### `payment` — entité `Payment`
-
-| Colonne | Type | Nul | Description |
-|---|---|---|---|
-| `booking_id` | `INT` → `booking` | | Réservation, unique |
-| `amount_cents` | `INT` | | Montant en centimes |
-| `status` | `VARCHAR(20)` | | `paid` ou `refunded` |
-| `paid_at` | `DATETIME` | | Date du paiement simulé |
-| `refunded_at` | `DATETIME` | oui | Date du remboursement simulé |
-
-### `review` — entité `Review`
-
-| Colonne | Type | Nul | Description |
-|---|---|---|---|
-| `trip_id` | `INT` → `trip` | | Trajet concerné |
-| `author_id` | `INT` → `app_user` | | Auteur de l'avis |
-| `target_id` | `INT` → `app_user` | | Personne évaluée |
-| `rating` | `INT` | | Note de 1 à 5 |
-| `comment` | `LONGTEXT` | oui | Commentaire |
-| `created_at` | `DATETIME` | | Date de dépôt |
-
-### `notification` — entité `Notification`
-
-| Colonne | Type | Nul | Description |
-|---|---|---|---|
-| `recipient_id` | `INT` → `app_user` | | Destinataire |
-| `message` | `LONGTEXT` | | Message |
-| `is_read` | `TINYINT` | | État de lecture |
-| `created_at` | `DATETIME` | | Date de création |
-
----
-
-## 4. Choix de conception
+## Choix de conception
 
 ### Le segment comme unité de calcul
 
@@ -233,34 +58,21 @@ Les montants sont en centimes de MAD et les distances en mètres, tous stockés 
 
 Les clés étrangères n'ont pas de suppression en cascade au niveau de la base : un compte, un véhicule ou un trajet référencé par des réservations ne peut pas être supprimé. Les annulations sont des changements d'état, pas des suppressions.
 
-### Coordonnées géographiques
+### Coordonnées et horaires
 
-Les coordonnées sont en `DECIMAL(9,6)`, ce qui couvre toute la plage de longitude avec une précision d'environ 10 cm.
+Les coordonnées sont en `DECIMAL(9,6)`, ce qui couvre toute la plage de longitude avec une précision d'environ 10 cm. Les horaires sont stockés à l'heure du Maroc (`Africa/Casablanca`), fuseau configuré pour PHP. La première étape n'a pas d'heure d'arrivée et la dernière n'a pas d'heure de départ.
 
-### Horaires
+## Contraintes en base
 
-Les horaires sont stockés à l'heure du Maroc (`Africa/Casablanca`), fuseau configuré pour PHP.
+Les contraintes d'unicité sont déclarées dans les entités et marquées `UK` sur le diagramme, ou portent sur plusieurs colonnes :
 
----
-
-## 5. Contraintes en base
-
-### Unicité
-
-Déclarée dans les entités.
-
-| Table | Colonnes uniques |
+| Table | Colonnes uniques ensemble |
 |---|---|
-| `app_user` | `email` |
-| `city` | `name` |
 | `trip_stop` | `trip_id`, `position` |
 | `trip_segment` | `trip_id`, `position` |
-| `payment` | `booking_id` |
 | `review` | `trip_id`, `author_id`, `target_id` |
 
-### Contrôles `CHECK`
-
-Ils portent uniquement sur la validité d'une ligne et sont ajoutés dans la migration, car Doctrine ne les génère pas.
+Les contrôles `CHECK` portent uniquement sur la validité d'une ligne et sont ajoutés dans la migration, car Doctrine ne les génère pas :
 
 | Table | Contrôle |
 |---|---|
@@ -271,7 +83,5 @@ Ils portent uniquement sur la validité d'une ligne et sont ajoutés dans la mig
 | `booking` | `seats > 0` ; montants positifs ou nuls ; `total_price_cents = seat_price_cents * seats` ; étapes de montée et de descente différentes |
 | `payment` | `amount_cents >= 0` |
 | `review` | `rating` entre 1 et 5 ; auteur et destinataire différents |
-
-### Règles portées par le code métier
 
 Les règles qui concernent plusieurs lignes sont appliquées dans le code métier : disponibilité des places, ordre des étapes d'une réservation, réservation active unique par passager et par trajet.
