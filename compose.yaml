@@ -40,5 +40,23 @@ services:
       retries: 30
       start_period: 20s
 
+  # Base dédiée aux tests automatisés, en mémoire, démarrée uniquement avec le profil « test ».
+  db_test:
+    image: mysql:8.4
+    profiles: ["test"]
+    environment:
+      MYSQL_DATABASE: covoiturage_test
+      MYSQL_USER: test
+      MYSQL_PASSWORD: test
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -utest -ptest --silent"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+
 volumes:
   db_data:
