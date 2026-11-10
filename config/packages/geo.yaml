@@ -1,0 +1,38 @@
+# Services cartographiques OpenStreetMap (niveau 4).
+# Les adresses des services sont des variables d'environnement : on peut en changer sans modifier le code,
+# comme le demande la politique d'usage de Nominatim.
+framework:
+    http_client:
+        scoped_clients:
+            nominatim.client:
+                base_uri: '%env(NOMINATIM_URL)%'
+                headers:
+                    User-Agent: '%env(OSM_USER_AGENT)%'
+                timeout: 5
+            osrm.client:
+                base_uri: '%env(OSRM_URL)%'
+                headers:
+                    User-Agent: '%env(OSM_USER_AGENT)%'
+                timeout: 8
+
+    # Une requête par seconde au plus vers chaque service, pour toute l'application.
+    rate_limiter:
+        nominatim:
+            policy: fixed_window
+            limit: 1
+            interval: '1 second'
+        osrm:
+            policy: fixed_window
+            limit: 1
+            interval: '1 second'
+
+twig:
+    globals:
+        map_tile_url: '%env(MAP_TILE_URL)%'
+        price_per_km_cents: '%env(int:PRICE_PER_KM_CENTS)%'
+
+# En test, aucune requête ne part vers les vrais services : réponses simulées.
+when@test:
+    framework:
+        http_client:
+            mock_response_factory: App\Tests\Support\FakeOsmResponses
