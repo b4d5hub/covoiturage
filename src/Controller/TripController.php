@@ -8,6 +8,8 @@ use App\Entity\User;
 use App\Enum\TripStatus;
 use App\Exception\DomainRuleException;
 use App\Form\BookingRequestType;
+use App\Geo\Coordinates;
+use App\Geo\OsrmRouter;
 use App\Repository\BookingRepository;
 use App\Repository\ReviewRepository;
 use App\Service\BookingService;
@@ -30,6 +32,7 @@ final class TripController extends AbstractController
         ReviewRepository $reviews,
         PortionPricing $pricing,
         EntityManagerInterface $entityManager,
+        OsrmRouter $router,
     ): Response {
         $user = $this->getUser();
         $now = new \DateTimeImmutable();
@@ -91,6 +94,28 @@ final class TripController extends AbstractController
             'isOpen' => $isOpen,
             'canBook' => $canBook,
             'driverRating' => $reviews->ratingOf($trip->getDriver()),
+            'map' => $this->mapData($stops, $router),
         ], new Response(null, $form->isSubmitted() && !$form->isValid() ? 422 : 200));
+    }
+
+    /**
+     * Données de la carte : étapes et tracé OSRM, ou lignes droites entre les étapes si le service ne répond pas.
+     *
+     * @param list<TripStop> $stops
+     */
+    private function mapData(array $stops, OsrmRouter $router): array
+    {
+        $points = array_map(static fn (TripStop $stop) => new Coordinates($stop->getLatitude(), $stop->getLongitude()), $stops);
+        $route = $router->route($points);
+
+        return [
+            'stops' => array_map(static fn (TripStop $stop) => [
+                'latitude' => (float) $stop->getLatitude(),
+                'longitude' => (float) $stop->getLongitude(),
+                'label' => $stop->getCity().' – '.$stop->getMeetingAddress(),
+            ], $stops),
+            'path' => $route?->path ?: array_map(static fn (TripStop $stop) => [(float) $stop->getLatitude(), (float) $stop->getLongitude()], $stops),
+            'approximate' => null === $route,
+        ];
     }
 }
