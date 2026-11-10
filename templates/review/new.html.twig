@@ -1,0 +1,17 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Laisser un avis – Covoiturage régional{% endblock %}
+
+{% block body %}
+    <section class="card narrow">
+        <h1>Avis sur {{ target.displayName }}</h1>
+        <p class="muted">Trajet {{ trip.routeLabel }} du {{ trip.departureAt|date('d/m/Y') }}. Un seul avis par personne et par trajet, dans les 14 jours qui suivent sa fin.</p>
+
+        {{ form_start(form) }}
+            {{ form_errors(form) }}
+            {{ form_row(form.rating) }}
+            {{ form_row(form.comment) }}
+            <button class="button" type="submit">Publier l'avis</button>
+        {{ form_end(form) }}
+    </section>
+{% endblock %}

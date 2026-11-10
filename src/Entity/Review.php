@@ -2,13 +2,14 @@
 
 namespace App\Entity;
 
+use App\Repository\ReviewRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
  * Avis entre un passager et le conducteur, dans un sens donné, pour un trajet.
  */
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: ReviewRepository::class)]
 #[ORM\UniqueConstraint(name: 'uniq_review_direction', columns: ['trip_id', 'author_id', 'target_id'])]
 class Review
 {

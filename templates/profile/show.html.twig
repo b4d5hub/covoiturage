@@ -1,0 +1,37 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ member.displayName }} – Covoiturage régional{% endblock %}
+
+{% block body %}
+    <header class="page-header">
+        <div>
+            <h1>{{ member.displayName }}</h1>
+            <p class="muted">Membre depuis {{ member.createdAt|date('m/Y') }}</p>
+        </div>
+        <div class="card rating">
+            {% if rating.count > 0 %}
+                <p class="price">{{ rating.average|number_format(1, ',') }}/5</p>
+                <p class="muted">{{ rating.count }} avis reçu{{ rating.count > 1 ? 's' }}</p>
+            {% else %}
+                <p class="muted">Pas encore d'avis</p>
+            {% endif %}
+        </div>
+    </header>
+
+    <p class="muted">{{ tripsAsDriver }} trajet{{ tripsAsDriver > 1 ? 's' }} effectué{{ tripsAsDriver > 1 ? 's' }} comme conducteur · {{ tripsAsPassenger }} comme passager</p>
+
+    <h2>Avis reçus</h2>
+    {% for review in reviews %}
+        <article class="card">
+            <p>
+                <strong>{{ review.rating }}/5</strong>
+                · <a href="{{ path('app_profile', {id: review.author.id}) }}">{{ review.author.displayName }}</a>
+                ({{ review.author is same as(review.trip.driver) ? 'conducteur' : 'passager' }})
+                · <span class="muted">{{ review.trip.routeLabel }}, {{ review.createdAt|date('d/m/Y') }}</span>
+            </p>
+            {% if review.comment %}<p>{{ review.comment }}</p>{% endif %}
+        </article>
+    {% else %}
+        <p class="muted">Aucun avis pour le moment.</p>
+    {% endfor %}
+{% endblock %}
