@@ -197,3 +197,16 @@ Les politiques d'usage ont été relues le 2026-11-10 sur leurs pages officielle
 | Panne d'un service | Saisie manuelle des coordonnées et des distances toujours possible ; la carte trace alors des lignes droites entre les étapes, en le signalant. |
 | Tracé affiché | Tracé simplifié fourni par OSRM, suffisant pour une vue d'ensemble et léger à charger. |
 | Tests | Aucun appel réel pendant les tests : les deux services sont simulés. |
+
+---
+
+## 2026-11-10 — Livraison (niveau 5)
+
+| Sujet | Décision | Justification |
+|---|---|---|
+| Commande unique | `docker compose up -d --wait` installe les dépendances, crée le schéma par les migrations et charge les données de démonstration, puis rend la main quand l'application répond. | Le sujet demande une installation en une commande. |
+| Données de démonstration | Chargées au premier démarrage uniquement, si la base ne contient aucun compte ; jamais rechargées ensuite. | Un redémarrage ne doit pas effacer les données saisies. |
+| Ordre de démarrage | Contrôles de santé : PHP attend MySQL, Nginx attend que PHP ait terminé sa préparation. | Évite les erreurs pendant le premier démarrage. |
+| Droits sur les fichiers | Le conteneur PHP s'exécute avec l'identifiant de l'utilisateur hôte (1000 par défaut, modifiable par `HOST_UID` et `HOST_GID`). | Sous Linux, les fichiers créés appartiennent à l'utilisateur et PHP peut écrire dans `var/`. |
+| Environnement | Mode `dev` ; les classes proxy Doctrine ne sont régénérées que si elles manquent ou si l'entité a changé. | Le mode `dev` donne accès aux données de démonstration ; la régénération à chaque requête provoquait des collisions entre requêtes simultanées. |
+| Vérification | Installation répétée à partir d'une copie exacte du dépôt, dans un projet Docker distinct ; essai prévu sur une machine virtuelle Ubuntu vierge. | Le sujet demande une installation testée sur une machine propre. |
