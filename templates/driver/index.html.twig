@@ -1,0 +1,77 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Espace conducteur – Covoiturage régional{% endblock %}
+
+{% macro trip_card(item) %}
+    {% set trip = item.trip %}
+    <article class="card">
+        <div class="page-header">
+            <div>
+                <p class="route"><a href="{{ path('app_trip_show', {id: trip.id}) }}">{{ trip.routeLabel }}</a> <span class="tag">{{ trip.statusLabel }}</span></p>
+                <p class="muted">Départ le {{ trip.departureAt|date('d/m/Y à H:i') }} · {{ trip.vehicle }} · {{ trip.seatCapacity }} places · {{ trip.fullPriceCents|mad }}</p>
+                {% if item.occupancy is not empty %}
+                    <p class="muted">Places occupées par segment :
+                        {% for position, occupied in item.occupancy %}{{ trip.stopAt(position).city }} → {{ trip.stopAt(position + 1).city }} {{ occupied }}/{{ trip.seatCapacity }}{{ not loop.last ? ' · ' }}{% endfor %}
+                    </p>
+                {% endif %}
+                {% if trip.cancellationReason %}<p class="muted">Motif d'annulation : {{ trip.cancellationReason }}</p>{% endif %}
+            </div>
+        </div>
+
+        <h3>Passagers</h3>
+        {% for booking in item.passengers %}
+            <p>
+                <a href="{{ path('app_profile', {id: booking.passenger.id}) }}">{{ booking.passenger.displayName }}</a>
+                — {{ booking.boardingStop.city }} → {{ booking.alightingStop.city }}, {{ booking.seats }} place{{ booking.seats > 1 ? 's' }}
+                {% if booking.passenger in item.reviewable %}
+                    · <a href="{{ path('app_review_new', {id: trip.id, target: booking.passenger.id}) }}">Noter</a>
+                {% endif %}
+            </p>
+        {% else %}
+            <p class="muted">Aucun passager.</p>
+        {% endfor %}
+
+        <div class="actions">
+            {% if item.canComplete %}
+                <form method="post" action="{{ path('app_driver_complete', {id: trip.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('complete-trip-' ~ trip.id) }}">
+                    <button class="button" type="submit">Marquer comme effectué</button>
+                </form>
+            {% endif %}
+            {% if item.canCancel %}
+                <details>
+                    <summary class="button button-secondary">Annuler le trajet</summary>
+                    <form method="post" action="{{ path('app_driver_cancel', {id: trip.id}) }}">
+                        <label for="reason-{{ trip.id }}">Motif (communiqué aux passagers)</label>
+                        <textarea id="reason-{{ trip.id }}" name="reason" required></textarea>
+                        <input type="hidden" name="_token" value="{{ csrf_token('cancel-trip-' ~ trip.id) }}">
+                        <button class="button button-danger" type="submit">Confirmer l'annulation</button>
+                    </form>
+                </details>
+            {% endif %}
+        </div>
+    </article>
+{% endmacro %}
+
+{% block body %}
+    <header class="page-header">
+        <h1>Espace conducteur</h1>
+        <div class="actions">
+            <a class="button" href="{{ path('app_driver_publish') }}">Publier un trajet</a>
+            <a class="button button-secondary" href="{{ path('app_driver_vehicles') }}">Mes véhicules</a>
+        </div>
+    </header>
+
+    {% if not hasVehicle %}
+        <p class="card">Pour publier un trajet, <a href="{{ path('app_driver_vehicles') }}">ajoutez d'abord votre véhicule</a>.</p>
+    {% endif %}
+
+    <h2>Trajets à venir</h2>
+    {% for item in upcoming %}{{ _self.trip_card(item) }}{% else %}<p class="muted">Aucun trajet à venir.</p>{% endfor %}
+
+    <h2>Trajets partis, à clôturer</h2>
+    {% for item in toClose %}{{ _self.trip_card(item) }}{% else %}<p class="muted">Aucun trajet en attente.</p>{% endfor %}
+
+    <h2>Historique</h2>
+    {% for item in history %}{{ _self.trip_card(item) }}{% else %}<p class="muted">Aucun trajet terminé ou annulé.</p>{% endfor %}
+{% endblock %}

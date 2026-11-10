@@ -1,0 +1,27 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Mes véhicules – Covoiturage régional{% endblock %}
+
+{% block body %}
+    <h1>Mes véhicules</h1>
+
+    <section class="card">
+        {% for vehicle in vehicles %}
+            <p>{{ vehicle }} · {{ vehicle.passengerSeats }} places passagers</p>
+        {% else %}
+            <p class="muted">Aucun véhicule enregistré.</p>
+        {% endfor %}
+    </section>
+
+    <section class="card narrow">
+        <h2>Ajouter un véhicule</h2>
+        {{ form_start(form) }}
+            {{ form_widget(form) }}
+            <button class="button" type="submit">Ajouter</button>
+        {{ form_end(form) }}
+    </section>
+
+    {% if vehicles is not empty %}
+        <p><a class="button" href="{{ path('app_driver_publish') }}">Publier un trajet</a></p>
+    {% endif %}
+{% endblock %}

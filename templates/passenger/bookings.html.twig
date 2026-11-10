@@ -1,0 +1,43 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Mes réservations – Covoiturage régional{% endblock %}
+
+{% block body %}
+    <h1>Mes réservations</h1>
+
+    {% for item in items %}
+        {% set booking = item.booking %}
+        {% set trip = booking.trip %}
+        <article class="card trip-card">
+            <div class="trip-main">
+                <p class="route">
+                    <a href="{{ path('app_trip_show', {id: trip.id}) }}">{{ booking.boardingStop.city }} → {{ booking.alightingStop.city }}</a>
+                    <span class="tag {{ booking.confirmed ? '' : 'tag-muted' }}">{{ booking.statusLabel }}</span>
+                    {% if trip.statusLabel != 'Publié' %}<span class="tag tag-muted">Trajet {{ trip.statusLabel|lower }}</span>{% endif %}
+                </p>
+                <p class="muted">
+                    Départ le {{ booking.boardingStop.departureAt|date('d/m/Y à H:i') }} de {{ booking.boardingStop.meetingAddress }}
+                    · Conducteur : <a href="{{ path('app_profile', {id: trip.driver.id}) }}">{{ trip.driver.displayName }}</a>
+                </p>
+                <p class="muted">
+                    {{ booking.seats }} place{{ booking.seats > 1 ? 's' }} · {{ booking.totalPriceCents|mad }}
+                    {% if item.payment %}· Paiement simulé : {{ item.payment.statusLabel|lower }}{% endif %}
+                </p>
+            </div>
+            <div class="trip-side">
+                {% if item.canCancel %}
+                    <form method="post" action="{{ path('app_booking_cancel', {id: booking.id}) }}" onsubmit="return confirm('Annuler cette réservation ?');">
+                        <input type="hidden" name="_token" value="{{ csrf_token('cancel-booking-' ~ booking.id) }}">
+                        <button class="button button-secondary" type="submit">Annuler</button>
+                    </form>
+                    <p class="muted small">Possible jusqu'au {{ booking.cancellationDeadline|date('d/m/Y à H:i') }}</p>
+                {% endif %}
+                {% if item.canReview %}
+                    <a class="button" href="{{ path('app_review_new', {id: trip.id, target: trip.driver.id}) }}">Noter le conducteur</a>
+                {% endif %}
+            </div>
+        </article>
+    {% else %}
+        <p class="card muted">Vous n'avez encore aucune réservation. <a href="{{ path('app_home') }}">Rechercher un trajet</a></p>
+    {% endfor %}
+{% endblock %}

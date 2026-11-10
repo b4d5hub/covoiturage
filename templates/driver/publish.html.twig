@@ -1,0 +1,49 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Publier un trajet – Covoiturage régional{% endblock %}
+
+{% macro stop_fields(line) %}
+    <fieldset class="stop" data-collection-item>
+        <legend>Étape</legend>
+        <div class="stop-grid">
+            {{ form_row(line.city) }}
+            {{ form_row(line.meetingAddress) }}
+            {{ form_row(line.latitude) }}
+            {{ form_row(line.longitude) }}
+            {{ form_row(line.arrivalAt) }}
+            {{ form_row(line.departureAt) }}
+            {{ form_row(line.distanceToNextMeters) }}
+        </div>
+        <button type="button" class="button button-secondary button-small" data-collection-remove>Retirer cette étape</button>
+    </fieldset>
+{% endmacro %}
+
+{% block body %}
+    <h1>Publier un trajet</h1>
+
+    {{ form_start(form) }}
+        {{ form_errors(form) }}
+        <section class="card">
+            {{ form_row(form.vehicle) }}
+            {{ form_row(form.seatCapacity) }}
+            {{ form_row(form.fullPriceCents) }}
+        </section>
+
+        <section class="card" data-collection data-prototype="{{ _self.stop_fields(form.itinerary.vars.prototype)|e('html_attr') }}">
+            <h2>Itinéraire</h2>
+            <p class="muted">Étapes dans l'ordre du trajet, heures du Maroc. La première étape n'a qu'un départ, la dernière qu'une arrivée. Indiquez pour chaque étape la distance routière jusqu'à la suivante.</p>
+            {{ form_errors(form.itinerary) }}
+            <div data-collection-list>
+                {% for line in form.itinerary %}{{ _self.stop_fields(line) }}{% endfor %}
+            </div>
+            <button type="button" class="button button-secondary" data-collection-add>Ajouter une étape</button>
+        </section>
+
+        {% do form.itinerary.setRendered %}
+        <button class="button" type="submit">Publier le trajet</button>
+    {{ form_end(form) }}
+{% endblock %}
+
+{% block javascripts %}
+    <script src="{{ asset('js/collection.js') }}" defer></script>
+{% endblock %}

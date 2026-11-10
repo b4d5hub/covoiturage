@@ -1,0 +1,16 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Notifications – Covoiturage régional{% endblock %}
+
+{% block body %}
+    <h1>Notifications</h1>
+
+    {% for item in items %}
+        <article class="card {{ item.isNew ? 'unread' : '' }}">
+            <p class="muted small">{{ item.notification.createdAt|date('d/m/Y à H:i') }}{% if item.isNew %} · <strong>Nouvelle</strong>{% endif %}</p>
+            <p>{{ item.notification.message }}</p>
+        </article>
+    {% else %}
+        <p class="card muted">Aucune notification.</p>
+    {% endfor %}
+{% endblock %}
