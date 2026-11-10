@@ -10,6 +10,7 @@
             {{ form_row(line.meetingAddress) }}
             {{ form_row(line.latitude) }}
             {{ form_row(line.longitude) }}
+            <div><button type="button" class="button button-secondary button-small" data-geocode>Trouver les coordonnées</button><span class="geo-status" data-geo-status></span></div>
             {{ form_row(line.arrivalAt) }}
             {{ form_row(line.departureAt) }}
             {{ form_row(line.distanceToNextMeters) }}
@@ -29,7 +30,7 @@
             {{ form_row(form.fullPriceCents) }}
         </section>
 
-        <section class="card" data-collection data-prototype="{{ _self.stop_fields(form.itinerary.vars.prototype)|e('html_attr') }}">
+        <section class="card" data-collection data-geo-assist data-geocode-url="{{ path('app_geo_geocode') }}" data-route-url="{{ path('app_geo_route') }}" data-prototype="{{ _self.stop_fields(form.itinerary.vars.prototype)|e('html_attr') }}">
             <h2>Itinéraire</h2>
             <p class="muted">Étapes dans l'ordre du trajet, heures du Maroc. La première étape n'a qu'un départ, la dernière qu'une arrivée. Indiquez pour chaque étape la distance routière jusqu'à la suivante.</p>
             {{ form_errors(form.itinerary) }}
@@ -37,6 +38,11 @@
                 {% for line in form.itinerary %}{{ _self.stop_fields(line) }}{% endfor %}
             </div>
             <button type="button" class="button button-secondary" data-collection-add>Ajouter une étape</button>
+            <div class="route-assist">
+                <button type="button" class="button" data-route>Calculer les distances et le prix suggéré</button>
+                <span data-route-status class="muted"></span>
+            </div>
+            <p class="muted small">Aide facultative : géocodage par Nominatim et distances routières par OSRM, données © contributeurs OpenStreetMap (licence ODbL). Saisissez une adresse publique, jamais une adresse personnelle. Le prix suggéré se base sur {{ (price_per_km_cents / 100)|number_format(2, ',') }} MAD par kilomètre.</p>
         </section>
 
         {% do form.itinerary.setRendered %}
@@ -46,4 +52,5 @@
 
 {% block javascripts %}
     <script src="{{ asset('js/collection.js') }}" defer></script>
+    <script src="{{ asset('js/geo-assist.js') }}" defer></script>
 {% endblock %}
