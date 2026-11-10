@@ -176,3 +176,24 @@ Ces précisions fixent les cas limites des règles déjà décidées, sans les m
 | Notifications | Affichées dans l'espace de l'utilisateur, marquées comme lues à la consultation. | Notification dans l'application, sans e-mail. |
 | Modification d'un trajet par le back-office | Prend le même verrou que la réservation et refuse l'enregistrement si l'itinéraire a été gelé entre-temps. | Le gel reste définitif même en cas de modification concurrente. |
 | Données de démonstration | Aucun événement n'est daté dans le futur : une réservation sur un trajet à venir est datée au plus tard deux heures avant le chargement. | Les dates restent vraisemblables quel que soit le jour du chargement. |
+
+---
+
+## 2026-11-10 — Services cartographiques (niveau 4)
+
+Les politiques d'usage ont été relues le 2026-11-10 sur leurs pages officielles : [Nominatim](https://operations.osmfoundation.org/policies/nominatim/), [tuiles OpenStreetMap](https://operations.osmfoundation.org/policies/tiles/) et serveur de démonstration OSRM ([présentation](https://github.com/Project-OSRM/osrm-backend/wiki/Demo-server), [règles d'usage](https://github.com/Project-OSRM/osrm-backend/wiki/Api-usage-policy)).
+
+| Exigence ou sujet | Décision |
+|---|---|
+| Débit maximal (Nominatim et OSRM : une requête par seconde) | Un limiteur partagé par toute l'application, une requête par seconde au plus vers chaque service, appliqué avant chaque appel. |
+| Identification | Requêtes envoyées par notre serveur avec un User-Agent propre à l'application (`OSM_USER_AGENT`), jamais celui de la bibliothèque HTTP. Aucune adresse e-mail personnelle n'y figure. |
+| Mise en cache | Résultats de géocodage conservés 30 jours, itinéraires 7 jours. Une indisponibilité n'est pas mise en cache. |
+| Changement de service | Adresses de Nominatim, d'OSRM et des tuiles dans des variables d'environnement : on peut en changer sans modifier le code. |
+| Usage déclenché par l'utilisateur | Géocodage et calcul d'itinéraire uniquement sur clic du conducteur dans le formulaire de publication ; aucune autocomplétion, aucune requête périodique. |
+| Données personnelles | Le formulaire demande l'adresse d'un point de rendez-vous public ; seuls cette adresse et le nom de la ville sont transmis à Nominatim. |
+| Attribution | « © contributeurs OpenStreetMap » sur la carte et dans le formulaire, mention d'OSRM pour le tracé, lien « Signaler une erreur de carte ». |
+| Tuiles | URL exacte `https://tile.openstreetmap.org/{z}/{x}/{y}.png`, chargées par le navigateur (cache et en-tête Referer du navigateur, pas de politique Referrer restrictive), sans préchargement. |
+| Prix suggéré | Distance routière totale × 0,50 MAD par kilomètre (`PRICE_PER_KM_CENTS=50`), arrondi au dirham. Le conducteur peut le modifier ; il reste libre de son prix. |
+| Panne d'un service | Saisie manuelle des coordonnées et des distances toujours possible ; la carte trace alors des lignes droites entre les étapes, en le signalant. |
+| Tracé affiché | Tracé simplifié fourni par OSRM, suffisant pour une vue d'ensemble et léger à charger. |
+| Tests | Aucun appel réel pendant les tests : les deux services sont simulés. |
