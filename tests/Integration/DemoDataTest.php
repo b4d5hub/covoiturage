@@ -172,4 +172,15 @@ final class DemoDataTest extends DatabaseTestCase
             self::assertTrue($trip->getBookings()->exists(fn ($k, Booking $b) => $b->getPassenger() === $passenger && BookingStatus::Confirmed === $b->getStatus()));
         }
     }
+
+    public function testNoDemoEventIsDatedInTheFuture(): void
+    {
+        foreach ([
+            'booking.created_at', 'booking.cancelled_at', 'payment.paid_at', 'payment.refunded_at',
+            'trip.itinerary_frozen_at', 'trip.cancelled_at', 'trip.completed_at', 'review.created_at', 'notification.created_at',
+        ] as $column) {
+            [$table, $field] = explode('.', $column);
+            self::assertSame(0, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM $table WHERE $field > UTC_TIMESTAMP()"), $column);
+        }
+    }
 }

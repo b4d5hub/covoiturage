@@ -256,7 +256,7 @@ final class AppFixtures extends Fixture
             $boardingStop,
             $trip->getStopAt($alighting),
             $seats,
-            $boardingStop->getDepartureAt()->modify($daysFromDeparture.' days'),
+            $this->notLaterThan($boardingStop->getDepartureAt()->modify($daysFromDeparture.' days'), '-2 hours'),
         );
     }
 
@@ -265,13 +265,13 @@ final class AppFixtures extends Fixture
         $this->bookings->cancelByPassenger(
             $booking,
             $booking->getPassenger(),
-            $booking->getBoardingStop()->getDepartureAt()->modify($daysFromDeparture.' days'),
+            $this->notLaterThan($booking->getBoardingStop()->getDepartureAt()->modify($daysFromDeparture.' days'), '-1 hour'),
         );
     }
 
     private function cancelByDriver(Trip $trip, string $reason, int $daysFromDeparture): void
     {
-        $this->trips->cancel($trip, $trip->getDriver(), $reason, $trip->getDepartureAt()->modify($daysFromDeparture.' days'));
+        $this->trips->cancel($trip, $trip->getDriver(), $reason, $this->notLaterThan($trip->getDepartureAt()->modify($daysFromDeparture.' days'), '-1 hour'));
     }
 
     private function complete(Trip $trip): void
@@ -283,6 +283,14 @@ final class AppFixtures extends Fixture
     private function review(Trip $trip, string $author, string $target, int $rating, ?string $comment, int $days): void
     {
         $this->reviews->submit($trip, $this->users[$author], $this->users[$target], $rating, $comment, $this->localDate($days, '12:00'));
+    }
+
+    /** Les événements de démonstration ne sont jamais datés dans le futur, même pour un trajet à venir. */
+    private function notLaterThan(\DateTimeImmutable $candidate, string $latest): \DateTimeImmutable
+    {
+        $limit = new \DateTimeImmutable($latest);
+
+        return $candidate < $limit ? $candidate : $limit;
     }
 
     private function localDate(int $days, string $time): \DateTimeImmutable
