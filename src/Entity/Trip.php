@@ -4,6 +4,7 @@ namespace App\Entity;
 
 use App\Enum\TripStatus;
 use App\Exception\DomainRuleException;
+use App\Repository\TripRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -13,7 +14,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 /**
  * Trajet publié. Le conducteur est le propriétaire du véhicule : il n'est pas stocké une seconde fois.
  */
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: TripRepository::class)]
 #[ORM\HasLifecycleCallbacks]
 class Trip
 {

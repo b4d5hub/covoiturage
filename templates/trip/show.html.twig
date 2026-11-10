@@ -1,0 +1,77 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ trip.routeLabel }} – Covoiturage régional{% endblock %}
+
+{% block body %}
+    <header class="page-header">
+        <div>
+            <h1>{{ trip.routeLabel }}</h1>
+            <p class="muted">Départ le {{ trip.departureAt|date('d/m/Y à H:i') }} · <span class="tag">{{ trip.statusLabel }}</span></p>
+        </div>
+        <div class="card driver-card">
+            <p>Conducteur : <a href="{{ path('app_profile', {id: trip.driver.id}) }}">{{ trip.driver.displayName }}</a></p>
+            <p class="muted">
+                {% if driverRating.count > 0 %}{{ driverRating.average|number_format(1, ',') }}/5 ({{ driverRating.count }} avis){% else %}Pas encore d'avis{% endif %}
+            </p>
+            <p class="muted">{{ trip.vehicle }} · {{ trip.seatCapacity }} places proposées</p>
+        </div>
+    </header>
+
+    {% if trip.cancellationReason %}
+        <div class="flash flash-error">Trajet annulé par le conducteur. Motif : {{ trip.cancellationReason }}</div>
+    {% endif %}
+
+    <section class="card">
+        <h2>Itinéraire</h2>
+        <table>
+            <thead><tr><th>Étape</th><th>Point de rendez-vous</th><th>Arrivée</th><th>Départ</th></tr></thead>
+            <tbody>
+                {% for stop in stops %}
+                    <tr>
+                        <td><strong>{{ stop.city }}</strong></td>
+                        <td>{{ stop.meetingAddress }}</td>
+                        <td>{{ stop.arrivalAt ? stop.arrivalAt|date('d/m H:i') : '—' }}</td>
+                        <td>{{ stop.departureAt ? stop.departureAt|date('d/m H:i') : '—' }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="card">
+        <h2>Portions et prix</h2>
+        <p class="muted">Le prix d'une portion est proportionnel à sa distance routière. Prix du trajet complet : {{ trip.fullPriceCents|mad }}.</p>
+        <table>
+            <thead><tr><th>Portion</th><th>Prix par place</th><th>Places libres</th></tr></thead>
+            <tbody>
+                {% for portion in portions %}
+                    <tr>
+                        <td>{{ portion.boarding.city }} → {{ portion.alighting.city }}</td>
+                        <td>{{ portion.seatPrice|mad }}</td>
+                        <td>{{ portion.open ? portion.available : 'Départ passé' }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="card">
+        <h2>Réserver</h2>
+        {% if not isOpen %}
+            <p class="muted">Ce trajet n'est plus ouvert à la réservation.</p>
+        {% elseif not app.user %}
+            <p><a href="{{ path('app_login') }}">Connectez-vous</a> ou <a href="{{ path('app_register') }}">créez un compte</a> pour réserver.</p>
+        {% elseif not canBook %}
+            <p class="muted">Vous êtes le conducteur de ce trajet.</p>
+        {% else %}
+            {{ form_start(form, {attr: {class: 'inline-form'}}) }}
+                {{ form_errors(form) }}
+                {{ form_row(form.boarding) }}
+                {{ form_row(form.alighting) }}
+                {{ form_row(form.seats) }}
+                <button class="button" type="submit">Réserver et payer</button>
+            {{ form_end(form) }}
+            <p class="muted">Paiement simulé : la réservation est confirmée immédiatement, aucun montant réel n'est débité.</p>
+        {% endif %}
+    </section>
+{% endblock %}

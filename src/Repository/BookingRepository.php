@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\Booking;
 use App\Entity\Trip;
+use App\Entity\TripStop;
 use App\Entity\User;
 use App\Enum\BookingStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -87,5 +88,31 @@ class BookingRepository extends ServiceEntityRepository
     public function peakOccupiedSeats(Trip $trip): int
     {
         return max([0, ...array_values($this->occupiedSeatsBySegment($trip))]);
+    }
+
+    /** Places encore libres sur toute la portion, pour l'affichage (la réservation revérifie sous verrou). */
+    public function availableSeats(Trip $trip, TripStop $boarding, TripStop $alighting): int
+    {
+        $free = $trip->getSeatCapacity();
+
+        foreach ($this->occupiedSeatsBySegment($trip) as $position => $occupied) {
+            if ($position >= $boarding->getPosition() && $position < $alighting->getPosition()) {
+                $free = min($free, $trip->getSeatCapacity() - $occupied);
+            }
+        }
+
+        return max(0, $free);
+    }
+
+    /** @return list<Booking> */
+    public function findForPassenger(User $passenger): array
+    {
+        return $this->findBy(['passenger' => $passenger], ['createdAt' => 'DESC', 'id' => 'DESC']);
+    }
+
+    /** @return list<Booking> réservations confirmées, pour l'affichage */
+    public function findConfirmedForTrip(Trip $trip): array
+    {
+        return $this->findBy(['trip' => $trip, 'status' => BookingStatus::Confirmed], ['id' => 'ASC']);
     }
 }

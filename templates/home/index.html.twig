@@ -1,0 +1,62 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+    <section class="hero">
+        <h1>Voyagez entre les villes du Maroc</h1>
+        <p>Réservez une place sur tout ou partie du trajet d'un conducteur.</p>
+
+        {{ form_start(form, {attr: {class: 'search-form'}}) }}
+            {{ form_row(form.from) }}
+            {{ form_row(form.to) }}
+            {{ form_row(form.date) }}
+            <button class="button" type="submit">Rechercher</button>
+        {{ form_end(form) }}
+    </section>
+
+    {% if results is not null %}
+        <section>
+            <h2>{{ results|length }} trajet{{ results|length > 1 ? 's' }} trouvé{{ results|length > 1 ? 's' }}</h2>
+
+            {% for result in results %}
+                {% set trip = result.trip %}
+                <article class="card trip-card">
+                    <div class="trip-main">
+                        <p class="route">{{ result.boarding.city }} <span aria-hidden="true">→</span> {{ result.alighting.city }}</p>
+                        <p class="muted">
+                            Départ le {{ result.boarding.departureAt|date('d/m/Y à H:i') }}, arrivée à {{ result.alighting.arrivalAt|date('H:i') }}
+                            · Trajet complet : {{ trip.routeLabel }}
+                        </p>
+                        <p class="muted">Conducteur : {{ trip.driver.displayName }} · {{ trip.vehicle }}</p>
+                    </div>
+                    <div class="trip-side">
+                        <p class="price">{{ result.seatPrice|mad }}</p>
+                        <p class="muted">par place</p>
+                        {% if result.available > 0 %}
+                            <p>{{ result.available }} place{{ result.available > 1 ? 's' }} libre{{ result.available > 1 ? 's' }}</p>
+                            <a class="button" href="{{ path('app_trip_show', {id: trip.id, depart: result.boarding.id, arrivee: result.alighting.id}) }}">Voir et réserver</a>
+                        {% else %}
+                            <p class="tag tag-muted">Complet sur cette portion</p>
+                        {% endif %}
+                    </div>
+                </article>
+            {% else %}
+                <p class="card muted">Aucun trajet ne correspond à cette recherche. Essayez une autre date.</p>
+            {% endfor %}
+        </section>
+    {% else %}
+        <section>
+            <h2>Prochains départs</h2>
+            <div class="grid">
+                {% for trip in upcoming %}
+                    <a class="card trip-link" href="{{ path('app_trip_show', {id: trip.id}) }}">
+                        <p class="route">{{ trip.routeLabel }}</p>
+                        <p class="muted">{{ trip.departureAt|date('d/m/Y à H:i') }} · {{ trip.stops|length }} étapes</p>
+                        <p>{{ trip.fullPriceCents|mad }} le trajet complet</p>
+                    </a>
+                {% else %}
+                    <p class="muted">Aucun départ prévu pour le moment.</p>
+                {% endfor %}
+            </div>
+        </section>
+    {% endif %}
+{% endblock %}
