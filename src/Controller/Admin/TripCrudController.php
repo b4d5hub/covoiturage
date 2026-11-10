@@ -40,6 +40,8 @@ final class TripCrudController extends AbstractCrudController
 {
     private ?int $requestedCapacity = null;
 
+    private bool $itineraryChanged = false;
+
     public function __construct(private readonly TripCapacityManager $capacityManager)
     {
     }
@@ -146,7 +148,23 @@ final class TripCrudController extends AbstractCrudController
 
     public function updateEntity(EntityManagerInterface $entityManager, object $entityInstance): void
     {
-        parent::updateEntity($entityManager, $entityInstance);
+        // Même verrou que la réservation : un gel survenu entre l'ouverture du formulaire
+        // et l'enregistrement est détecté, et une réservation concurrente attend la fin de la modification.
+        try {
+            $entityManager->getConnection()->transactional(function () use ($entityManager, $entityInstance): void {
+                $frozenAt = $entityManager->getConnection()->fetchOne('SELECT itinerary_frozen_at FROM trip WHERE id = ? FOR UPDATE', [$entityInstance->getId()]);
+
+                if ($this->itineraryChanged && null !== $frozenAt) {
+                    throw new DomainRuleException('une réservation a gelé l\'itinéraire pendant la modification.');
+                }
+
+                parent::updateEntity($entityManager, $entityInstance);
+            });
+        } catch (DomainRuleException $exception) {
+            $this->addFlash('danger', 'Modifications non enregistrées : '.$exception->getMessage());
+
+            return;
+        }
 
         if (null === $this->requestedCapacity || $this->requestedCapacity === $entityInstance->getSeatCapacity()) {
             return;
@@ -192,6 +210,7 @@ final class TripCrudController extends AbstractCrudController
 
             try {
                 $trip->replaceItinerary(array_map(static fn (ItineraryLine $line) => $line->toStop(), $lines), $distances);
+                $this->itineraryChanged = true;
             } catch (DomainRuleException $exception) {
                 $form->addError(new FormError($exception->getMessage()));
             }
