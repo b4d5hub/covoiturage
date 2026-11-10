@@ -1,0 +1,17 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Inscription – Covoiturage régional{% endblock %}
+
+{% block body %}
+    <section class="card narrow">
+        <h1>Créer un compte</h1>
+        <p class="muted">Un seul compte pour voyager comme passager et publier vos trajets comme conducteur.</p>
+
+        {{ form_start(form) }}
+            {{ form_widget(form) }}
+            <button class="button" type="submit">Créer mon compte</button>
+        {{ form_end(form) }}
+
+        <p class="muted">Déjà inscrit ? <a href="{{ path('app_login') }}">Se connecter</a></p>
+    </section>
+{% endblock %}

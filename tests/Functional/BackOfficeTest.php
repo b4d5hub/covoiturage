@@ -59,12 +59,12 @@ final class BackOfficeTest extends WebTestCase
     {
         $this->client->request('GET', '/admin/trip');
 
-        self::assertResponseRedirects('/login');
+        self::assertResponseRedirects('/connexion');
     }
 
     public function testLoginPageIsDisplayed(): void
     {
-        $this->client->request('GET', '/login');
+        $this->client->request('GET', '/connexion');
 
         self::assertResponseIsSuccessful();
     }

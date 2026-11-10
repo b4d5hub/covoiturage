@@ -2,13 +2,14 @@
 
 namespace App\Entity;
 
+use App\Repository\NotificationRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
  * Notification affichée dans l'espace passager.
  */
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: NotificationRepository::class)]
 class Notification
 {
     #[ORM\Id]
