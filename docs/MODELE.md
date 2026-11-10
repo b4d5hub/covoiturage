@@ -114,4 +114,4 @@ Ces règles portent sur plusieurs lignes. Elles sont contrôlées par les entit�
 - états à sens unique : trajet publié puis annulé ou effectué, réservation confirmée puis annulée, paiement payé puis remboursé ;
 - fin de trajet et avis.
 
-Ces opérations sont portées par les services de l'application. Les écrans passager et conducteur qui les appelleront sont prévus au niveau 3.
+Ces opérations sont portées par les services de l'application, appelés par les espaces passager et conducteur comme par les données de démonstration.

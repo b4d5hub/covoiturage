@@ -160,3 +160,19 @@ Ces précisions fixent les cas limites des règles déjà décidées, sans les m
 | Délai des avis | Quatorze jours après la date à laquelle le trajet est marqué effectué, limite incluse. | Cette date confirme que le trajet a eu lieu. |
 | Passager d'un trajet effectué | Seul un passager dont la réservation est restée confirmée peut déposer ou recevoir un avis. | Une réservation annulée ne correspond à aucun trajet effectué. |
 | Lecture sous verrou | Les lectures qui décident d'une opération suivent le verrou du trajet et utilisent une lecture verrouillante ou un rechargement. | Elles portent ainsi sur le dernier état validé. |
+
+---
+
+## 2026-11-10 — Interface publique (niveau 3)
+
+| Sujet | Décision | Justification |
+|---|---|---|
+| Interface | Pages Twig, une feuille de style et un court script sans dépendance, en français. | Le front est libre ; ce choix évite une chaîne de construction. |
+| Comptes | Inscription ouverte, un seul compte par personne. Publier un trajet demande d'avoir enregistré un véhicule. | Conforme aux décisions sur les comptes ; le conducteur est le propriétaire du véhicule. |
+| Identité publique | Les pages publiques affichent le prénom et l'initiale du nom ; l'adresse e-mail n'est jamais affichée. | Limite les données personnelles exposées. |
+| Recherche | Ville de départ, ville d'arrivée et date, interprétée comme un jour au Maroc. Un trajet correspond si la ville de départ précède la ville d'arrivée sur son itinéraire et si le départ de cette étape est encore à venir. | Le sujet demande une recherche par départ, arrivée et date ; les passagers peuvent ne faire qu'une partie du trajet. |
+| Réservation | Le passager choisit l'étape de montée, l'étape de descente et le nombre de places ; la page du trajet affiche le prix et les places libres de chaque portion. | Rend visibles le prix proportionnel et la disponibilité par segment. |
+| Espace conducteur | Trajets à venir, trajets partis à clôturer et historique, avec les passagers et l'occupation par segment. Actions : publier, annuler avec motif, marquer comme effectué, noter les passagers. | Couvre « trajets publiés, passagers, historique » et les règles d'annulation et d'avis. |
+| Notifications | Affichées dans l'espace de l'utilisateur, marquées comme lues à la consultation. | Notification dans l'application, sans e-mail. |
+| Modification d'un trajet par le back-office | Prend le même verrou que la réservation et refuse l'enregistrement si l'itinéraire a été gelé entre-temps. | Le gel reste définitif même en cas de modification concurrente. |
+| Données de démonstration | Aucun événement n'est daté dans le futur : une réservation sur un trajet à venir est datée au plus tard deux heures avant le chargement. | Les dates restent vraisemblables quel que soit le jour du chargement. |
