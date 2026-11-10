@@ -11,7 +11,9 @@ doctrine:
         profiling_collect_backtrace: '%kernel.debug%'
         use_savepoints: true
     orm:
-        auto_generate_proxy_classes: true
+        # Régénérées seulement si elles manquent ou si l'entité a changé : pas de réécriture
+        # à chaque requête, ce qui évite les collisions entre requêtes simultanées.
+        auto_generate_proxy_classes: FILE_NOT_EXISTS_OR_CHANGED
         enable_lazy_ghost_objects: true
         report_fields_where_declared: true
         validate_xml_mapping: true
