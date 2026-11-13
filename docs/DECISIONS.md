@@ -210,3 +210,133 @@ Les politiques d'usage ont été relues le 2026-11-10 sur leurs pages officielle
 | Droits sur les fichiers | Le conteneur PHP s'exécute avec l'identifiant de l'utilisateur hôte (1000 par défaut, modifiable par `HOST_UID` et `HOST_GID`). | Sous Linux, les fichiers créés appartiennent à l'utilisateur et PHP peut écrire dans `var/`. |
 | Environnement | Mode `dev` ; les classes proxy Doctrine ne sont régénérées que si elles manquent ou si l'entité a changé. | Le mode `dev` donne accès aux données de démonstration ; la régénération à chaque requête provoquait des collisions entre requêtes simultanées. |
 | Vérification | Installation répétée à partir d'une copie exacte du dépôt, dans un projet Docker distinct ; essai prévu sur une machine virtuelle Ubuntu vierge. | Le sujet demande une installation testée sur une machine propre. |
+
+---
+
+## 2026-11-10 — Refonte de l'interface publique
+
+Ces choix portent sur la présentation. Ils ne modifient aucune règle métier : chaque contrôle reste fait par le serveur, et les scripts ne servent qu'à guider la saisie.
+
+| Sujet | Décision | Justification |
+|---|---|---|
+| Système visuel | Une feuille de style organisée en jetons (couleurs, espacements, rayons) et en composants réutilisables ; un seul accent vert, les autres couleurs étant réservées aux états. Polices du système, sans police externe. | Interface cohérente d'une page à l'autre ; aucune requête vers un service tiers pour l'affichage du texte. |
+| Ligne de route | Les étapes d'un trajet sont affichées comme une ligne reliant les arrêts ; sur la page du trajet, la portion choisie par le passager y est mise en valeur. L'occupation de chaque segment est affichée au conducteur siège par siège. | Rend visibles la réservation par portion et la disponibilité par segment, qui sont au cœur du modèle. |
+| Réservation | Récapitulatif avant l'envoi (portion, prix par place, nombre de places, total) et lien « Choisir » sur chaque portion ouverte, qui préremplit le formulaire, y compris sans JavaScript. | Le passager voit le montant exact avant de confirmer. |
+| Choix proposé par défaut | Sans villes indiquées, le formulaire de réservation propose le trajet entier, depuis la première étape dont le départ est encore à venir. Depuis une recherche, il reprend les deux villes recherchées. | Un passager qui ne modifie pas les listes réserve le trajet affiché, pas seulement sa première étape. |
+| Résultats de recherche | Le titre ne compte que les trajets réservables. Les trajets complets entre les deux villes et ceux dont l'utilisateur est le conducteur restent affichés, à part, sous « Complets ou non réservables ». L'accueil ne met en avant qu'un trajet ayant des places du départ à l'arrivée. | « Trouvé » doit vouloir dire réservable ; le conducteur reconnaît son propre trajet. |
+| Prix affichés | Montants affichés au centime, exactement comme ils sont calculés et enregistrés ; seul le prix suggéré au conducteur est arrondi au dirham, comme décidé pour le niveau 4. | L'écran montre le montant réellement payé et remboursé. |
+| Actions irréversibles | Annulation d'une réservation, annulation d'un trajet et clôture d'un trajet passent par une boîte de confirmation qui rappelle leurs conséquences. Sans JavaScript, le formulaire s'envoie directement. | Évite les erreurs de manipulation sans bloquer les navigateurs sans script. |
+| Actions indisponibles | Une action impossible est remplacée par son explication : délai d'annulation de 2 heures dépassé, clôture possible à partir de l'arrivée prévue, délai d'avis de 14 jours dépassé, itinéraire gelé après la première réservation. | L'utilisateur comprend la règle au lieu de constater l'absence d'un bouton. |
+| Formulaire de publication | Étapes numérotées, réordonnables et ajoutées avant l'arrivée ; champs sans objet désactivés (pas d'arrivée au départ, ni de départ ni de distance à l'arrivée) ; récapitulatif avant publication. La saisie manuelle des coordonnées et des distances reste possible. | Rend la saisie d'un itinéraire à étapes plus sûre, sans dépendre des services cartographiques. |
+| Accessibilité | Lien d'accès au contenu, page courante signalée dans la navigation, erreurs reliées à leur champ (`aria-invalid`, `aria-describedby`), zones de clic d'au moins 44 px, navigation au clavier, mouvements réduits si le système le demande. | Utilisable au clavier, au lecteur d'écran et sur téléphone. |
+| Typographie | Apostrophe droite dans tous les textes, comme dans les messages produits par le serveur. | Un seul style sur une même page. |
+| Back-office | EasyAdmin conserve sa mise en page ; il reprend la couleur de l'application et propose un lien de retour vers le site. | L'administration reste distincte de l'espace public tout en partageant son identité. |
+
+---
+
+## 2026-11-11 — Identité visuelle affirmée
+
+Révision de la refonte du 2026-11-10 : l'interface adopte une identité plus marquée. Les règles métier ne changent pas.
+
+| Sujet | Décision | Justification |
+|---|---|---|
+| Typographie (remplace les polices du système) | Plus Jakarta Sans, police libre (licence SIL OFL, fichier `public/fonts/OFL.txt`), hébergée par l'application : aucune requête vers un service de polices à l'exécution. | Une police choisie donne une identité reconnaissable ; l'auto-hébergement garde le fonctionnement hors ligne sous Docker. |
+| Palette | Fond blanc, encre presque noire pour le texte et les boutons principaux, gris de remplissage pour les champs ; le vert reste l'unique accent, réservé aux trajets, aux places et aux sélections. | Contraste fort et lecture rapide ; la couleur garde un sens. |
+| Accueil | Carte du prochain trajet disponible en fond (tuiles OpenStreetMap atténuées en gris, tracé OSRM mis en cache), avec la recherche dans un panneau au premier plan. La carte est décorative et sans interaction ; l'attribution reste affichée. | Montre d'emblée un vrai trajet à étapes. Les tuiles sont chargées par le navigateur, comme sur la page du trajet, dans le respect de la politique d'usage déjà décrite. |
+| Réservation sur mobile | Barre fixe en bas de la page du trajet, avec le total de la sélection et un accès direct au formulaire. | Le montant et l'action restent visibles pendant la lecture de l'itinéraire. |
+
+
+---
+
+## 2026-11-12 — Points de rendez-vous, villes et recherche par rayon
+
+Révision des décisions sur les villes, le géocodage et la recherche. Les règles de réservation, de prix, de gel de l'itinéraire et de surréservation ne changent pas.
+
+| Sujet | Décision | Justification |
+|---|---|---|
+| Point de rendez-vous (remplace « Géocodage ») | Le conducteur choisit n'importe quel lieu (gare, adresse, quartier, commerce) parmi les résultats de Nominatim, ou clique sur la carte (géocodage inverse). Le lieu choisi fournit le nom affiché, l'adresse et les coordonnées de l'étape ; le conducteur peut préciser le libellé. | Un point de rendez-vous est souvent un endroit précis d'une ville, pas la ville elle-même. Seul un lieu connu d'OpenStreetMap peut être choisi. |
+| Ville d'une étape (remplace « Villes ») | Déterminée automatiquement par le serveur : géocodage inverse, au niveau de la localité (ville, commune ou village), des coordonnées de l'étape. La ville est identifiée par son type et son identifiant OpenStreetMap, créée à sa première utilisation puis réutilisée. Un point situé hors de toute localité est refusé. | Deux conducteurs qui choisissent des lieux d'une même ville obtiennent la même ville, quelle que soit l'orthographe : la recherche par ville reste fiable. Le serveur ne se fie pas à une ville envoyée par le navigateur. |
+| Périmètre géographique | Étapes limitées au Maroc (`countrycodes=ma` pour la recherche de lieux, pays vérifié par le serveur sur le géocodage inverse). Noms en français. | Plateforme de covoiturage régional au Maroc. |
+| Service indisponible | Si Nominatim ne répond pas, le conducteur choisit la ville dans la liste des villes déjà connues et saisit l'adresse et les coordonnées à la main, comme auparavant. | La publication reste possible en cas de panne, conformément à la décision du niveau 4. |
+| Villes au back-office | Consultation et correction du nom affiché ; plus de création manuelle. Une ville utilisée par une étape ne peut pas être supprimée. | Les villes proviennent d'OpenStreetMap ; l'identifiant OSM reste la référence. |
+| Recherche (remplace « Recherche » du niveau 3) | Départ et arrivée : une ville ou un lieu précis. Un nom de ville déjà connue est utilisé directement ; sinon le lieu est cherché dans Nominatim à l'envoi du formulaire, jamais pendant la frappe. Un trajet correspond si une étape de montée est dans la ville de départ **ou** à 5 km au plus du point de départ, si une étape de descente est dans la ville d'arrivée **ou** à 5 km au plus du point d'arrivée, si la montée précède la descente et si le départ de la montée a lieu le jour choisi et est encore à venir. | Un passager trouve aussi les trajets qui partent d'une localité voisine (Salé pour Rabat) ; la condition sur la ville couvre les grandes villes dont les étapes sont loin du centre. |
+| Rayon | Fixé à 5 km, distance à vol d'oiseau calculée par MySQL (`ST_Distance_Sphere`) après un filtrage rapide par latitude et longitude. | Proche du point voulu sans mélanger des villes éloignées ; calcul simple et testable. |
+| Choix des étapes dans un résultat | Si plusieurs paires d'étapes d'un trajet conviennent, la paire la plus proche des deux points recherchés est retenue. Résultats triés par distance du point de montée ; la distance est affichée (« point de rendez-vous à 1,8 km »). | Le passager voit d'abord les trajets qui partent le plus près de lui. |
+| Coordonnées d'une ville | Chaque ville conserve les coordonnées de son centre fournies par Nominatim ; elles servent de point de recherche quand le passager saisit une ville. | Permet le rayon de 5 km autour d'une ville saisie par son nom. |
+| Formulaire de publication (complète celui de la refonte) | Assistant pas à pas : véhicule et places, puis une étape par arrêt (lieu par recherche ou clic sur la carte, horaire) ; la carte affiche le tracé OSRM depuis l'arrêt précédent et la distance du tronçon ; ajouter un arrêt ou terminer ; prix suggéré ou prix du conducteur ; récapitulatif ; publication. Sans JavaScript, le formulaire complet reste utilisable. Toutes les règles restent vérifiées par le serveur. | Saisie guidée par la carte, sans dépendre du script pour publier. |
+| Page du trajet | Le tableau « Prix entre les étapes » affiche aussi le point de rendez-vous de chaque étape. | Le passager sait où il monte et descend, pas seulement dans quelle ville. |
+| Données de démonstration | Les villes de démonstration reprennent leurs identifiants et coordonnées OpenStreetMap réels, relevés une fois auprès de Nominatim. | Les villes de démonstration et celles créées par les conducteurs se confondent bien. |
+| Clic sur la carte | Le point cliqué est nommé par un géocodage inverse au niveau de l'adresse ; le repère de l'étape en cours peut être déplacé, ce qui redétermine sa ville. | Le conducteur peut désigner un lieu sans connaître son nom. |
+| Usage déclenché par l'utilisateur (complète le niveau 4) | Nominatim est appelé sur « Rechercher », sur un clic ou un déplacement du repère dans l'assistant, à la publication (ville de chaque étape, souvent déjà en cache) et à l'envoi d'une recherche passager dont le texte n'est pas une ville connue. Jamais pendant la frappe. | Conforme à la politique d'usage : pas d'autocomplétion ; le cache et la liste des villes connues limitent les requêtes. |
+| Données transmises (remplace « Données personnelles » du niveau 4) | Seuls le texte saisi dans la recherche de lieu et les coordonnées choisies sont transmis à Nominatim, jamais l'identité du conducteur ou du passager. Le formulaire rappelle de choisir un lieu public. | Limite les données personnelles envoyées à un service tiers. |
+| Recherche passager avec service partiel | Si le lieu est trouvé mais que sa ville ne peut pas être déterminée (service lent ou indisponible), la recherche se fait dans le rayon de 5 km seulement. | Le passager obtient des résultats plutôt qu'une erreur. |
+| Délai d'attente de Nominatim | 10 secondes. | Le serveur public répond parfois en plusieurs secondes ; 5 secondes provoquaient de fausses indisponibilités. |
+| Modification d'un trajet au back-office | L'administrateur choisit toujours la ville dans la liste ; elle n'est pas redéterminée d'après les coordonnées. | Le back-office sert à corriger des données, sans dépendre d'un service externe. |
+
+---
+
+## 2026-11-12 — Revue de l'interface
+
+Revue des écrans au regard de ce que permet le serveur. Les règles métier ne changent pas ; ces choix rendent visibles des données et des opérations qui existaient déjà.
+
+| Sujet | Décision | Justification |
+|---|---|---|
+| Réservation existante | La page d'un trajet sur lequel le passager a déjà une réservation confirmée affiche cette réservation à la place du formulaire. | Une seule réservation active par passager et par trajet : le formulaire aurait été refusé à l'envoi. |
+| Page d'une réservation | Chaque réservation a sa page, visible de son seul passager : étapes, horaires, conducteur, montant, dates du paiement simulé et du remboursement, annulation et avis. Après une réservation, le passager y arrive directement. | Les données existaient (dates de paiement, de remboursement, d'annulation) sans être affichées ; la page sert de confirmation. |
+| Places et prix modifiés par le conducteur | Depuis son espace, le conducteur modifie les places proposées et le prix du trajet entier, tant que le trajet est publié et n'est pas parti. Mêmes règles qu'au back-office, sous le verrou du trajet : pas moins que les places déjà occupées, pas plus que les places du véhicule ; le nouveau prix ne concerne que les réservations suivantes. | Ces modifications sont permises par les règles décidées le 2026-11-09 mais n'étaient accessibles qu'à l'administrateur. Après le départ, les modifier n'aurait plus de sens. |
+| Mon compte | Page réservée à l'utilisateur connecté : nom complet, adresse e-mail, date d'inscription et raccourcis. L'adresse de connexion apparaît aussi dans le menu du compte. | L'utilisateur voit avec quel compte il est connecté ; ces informations restent invisibles des autres membres. |
+| Distance affichée dans les résultats | La distance au point de départ n'est affichée que si l'étape de montée est hors de la ville recherchée, ou si le passager a cherché un lieu précis. | Pour une recherche « Agadir », une gare d'Agadir n'est pas « à 2,7 km d'Agadir ». |
+| Prix entre les étapes | Les trajets encore réservables sont listés ; les trajets complets ou déjà partis sont regroupés dans une section repliable. | Le tableau montrait surtout des lignes « Complet ». |
+| Page du trajet vue par son conducteur | Liste des passagers et accès direct à la gestion du trajet. | Le conducteur n'avait qu'un message « Vous êtes le conducteur ». |
+
+---
+
+## 2026-11-13 — Identité « Escale »
+
+L'interface publique et le back-office adoptent l'identité « Escale ». Elle remplace la typographie et la palette de l'entrée du 2026-11-11 ; les autres décisions d'interface restent valables.
+
+| Sujet | Décision | Justification |
+|---|---|---|
+| Palette (remplace « Palette » du 2026-11-11) | Aubergine pour l'en-tête, le texte et les actions principales, citron pour la sélection et les mises en avant, fonds ivoire et lilas. Les couleurs sont définies une seule fois dans `public/css/escale-tokens.css` et partagées avec le back-office. | Une identité chaleureuse et reconnaissable, commune à l'espace public et à l'administration. |
+| Typographie (remplace « Typographie » du 2026-11-11) | Chivo pour les titres et les prix, Rethink Sans pour le texte de l'interface. Polices libres (licence SIL OFL, fichiers `public/fonts/OFL-Chivo.txt` et `public/fonts/OFL-RethinkSans.txt`), hébergées par l'application. La police précédente, devenue inutile, est retirée. | Des titres affirmés et un texte lisible, sans requête vers un service de polices. |
+| Nom du produit | Le nom « Covoiturage régional » est affiché à côté du logo dans l'en-tête, sur ordinateur comme sur téléphone. | Un visiteur doit savoir sur quel site il se trouve sans descendre jusqu'au pied de page. |
+| Vocabulaire | Les textes affichés parlent de « trajet » et d'« étapes », jamais de « portion » ou de « segment », réservés au code et à la documentation. | Ce sont des mots de modélisation, pas ceux d'un passager. |
+| Typographie des textes (rappel) | L'apostrophe droite reste la règle dans tous les textes affichés. | Un seul style sur une même page, comme dans les messages produits par le serveur. |
+
+---
+
+## 2026-11-13 — Assistant de publication refait sur le modèle des plateformes existantes
+
+Comparaison avec les parcours de publication décrits par les centres d'aide de BlaBlaCar et de Poparide : le trajet est demandé d'abord, avec une seule date et une seule heure de départ, et les arrêts sont proposés le long de la route. Les règles de l'itinéraire, du prix et du gel ne changent pas : l'assistant remplit le formulaire complet, que le serveur valide comme avant.
+
+| Sujet | Décision | Justification |
+|---|---|---|
+| Ordre des étapes (complète « Formulaire de publication » du 2026-11-12) | Trajet (départ, arrivée, date, heure de départ), puis arrêts, véhicule et places, prix, récapitulatif. | Le conducteur commence par ce qu'il sait déjà : d'où, où et quand. |
+| Horaires | Le conducteur saisit une seule heure, celle du départ. Les heures d'arrivée sont calculées d'après la durée de conduite donnée par OSRM, arrondie à 5 minutes, avec un arrêt de 10 minutes à chaque étape intermédiaire. Chaque heure reste modifiable ; une heure modifiée est conservée. | Saisir deux dates et heures par étape était la principale difficulté. Les heures restent celles du conducteur, et le serveur vérifie toujours leur ordre. |
+| Arrêts proposés | Les villes déjà connues dont le centre est à 10 km au plus du tracé, hors départ et arrivée, sont proposées à cocher, dans l'ordre de la route. Calcul local sur les centres des villes, sans appel à Nominatim. Un autre arrêt reste possible par recherche ou clic sur la carte ; il est rangé à sa place sur la route. | Proposer plutôt que faire construire l'itinéraire arrêt par arrêt, sans requête supplémentaire vers un service externe. |
+| Point de rendez-vous d'une ville proposée | Une ville cochée devient un arrêt au centre-ville (« Centre-ville, Meknès »), que le conducteur peut préciser par recherche ou clic sur la carte. La ville de l'étape est toujours redéterminée par le serveur. | Ajout en un clic ; le libellé indique clairement qu'il s'agit du centre. |
+| Un seul champ par lieu, suggestions pendant la frappe | Le lieu choisi fournit le libellé du point de rendez-vous. Pendant la frappe (à partir de 2 caractères), les suggestions viennent uniquement de la base de l'application : villes connues et points de rendez-vous déjà utilisés par des trajets, comparés sans accents ni majuscules. Une dernière ligne « Chercher … sur la carte » interroge Nominatim, comme le bouton « Rechercher » : seulement sur demande du conducteur. Une ville choisie telle quelle devient un arrêt « Centre-ville », à préciser. | La politique d'usage de Nominatim interdit l'autocomplétion (« Auto-complete search […] you must not implement such a service on the client side »). Les suggestions locales donnent des résultats immédiats sans aucune requête externe ; le service Photon, conçu pour la saisie au fil de l'eau, a été écarté car il ajouterait un service tiers et remplacerait Nominatim, demandé par le sujet. |
+| Prix | Prix conseillé proposé par défaut, ajusté par pas de 5 MAD avec − et +, ou saisi. Aperçu du prix entre chaque paire d'étapes consécutives, calculé avec la même formule et le même arrondi que le serveur. Le prix reste unique pour le trajet entier. | Le conducteur voit ce que paieront les passagers ; la règle du prix proportionnel ne change pas. |
+| Saisie manuelle | Coordonnées, ville et distances ne sont plus visibles dans l'assistant. Le formulaire complet s'affiche si la carte ou un service ne répond pas, ou si le serveur renvoie des erreurs à corriger. | Ces champs techniques ne servent qu'en secours. |
+| Trajet retour | Depuis la page de son trajet, le conducteur ouvre l'assistant prérempli avec les étapes dans l'ordre inverse, les mêmes distances, le même véhicule, les mêmes places et le même prix ; il choisit la date et l'heure. Réservé au conducteur du trajet d'origine. | Les trajets se font souvent en aller-retour : on évite de tout ressaisir. |
+
+
+---
+
+## 2026-11-13 — Prix affichés sur l'itinéraire
+
+| Sujet | Décision | Justification |
+|---|---|---|
+| Prix entre les étapes (remplace la carte séparée du 2026-11-12) | La page du trajet n'a plus de carte « Prix entre les étapes ». Dans l'itinéraire, chaque étape située après l'étape de montée choisie affiche le prix par place depuis cette montée et les places libres, avec « Descendre ici » ; les étapes situées avant proposent « Monter ici ». Ces actions sont de simples liens qui préremplissent la réservation, mis à jour sans rechargement quand JavaScript est disponible. La grille complète de toutes les paires d'étapes reste disponible, repliée sous l'itinéraire. Rien n'est proposé au conducteur ni au passager qui a déjà réservé ce trajet. | Le passager lit le prix là où il lit la route, sans chercher sa ligne dans une grille ; le choix des étapes se fait à un seul endroit. |
+
+---
+
+## 2026-11-13 — Notifications des conducteurs et aperçu sous la cloche
+
+| Sujet | Décision | Justification |
+|---|---|---|
+| Notifications (complète « Notifications » du 2026-11-09) | Le conducteur reçoit une notification dans l'application à chaque réservation sur son trajet (passager, nombre de places, étapes, date du trajet), et quand un passager annule sa réservation (les places redeviennent disponibles). Chaque notification se rapporte à la réservation concernée et est datée de l'événement. Toujours sans e-mail. | Le conducteur apprend qu'une place est prise ou libérée sans consulter son espace ; la date reste juste pour les données de démonstration. |
+| Ouverture d'une notification | Une notification ouverte est marquée comme lue et mène à ce qu'elle concerne : la réservation pour le passager, le trajet dans l'espace conducteur pour le conducteur. Seul son destinataire peut l'ouvrir. La page de toutes les notifications reste disponible et les marque toutes comme lues. | Chaque notification conduit directement à l'action utile. |
+| Aperçu sous la cloche | Un clic sur la cloche ouvre les 5 dernières notifications, lues ou non, sans les marquer comme lues, avec « Voir toutes les notifications ». Sur téléphone, l'aperçu s'ouvre dans le menu, sous la cloche. Sans JavaScript, la cloche mène à la page des notifications. L'aperçu est demandé dès que le pointeur ou le clavier atteint la cloche. | Consultation rapide sans quitter la page, même sans nouveauté ; l'aperçu s'affiche sans attente perceptible. |
+| Fuseau horaire affiché | Les libellés des heures (formulaires de trajet, back-office compris, fiche du trajet, réservation, pied de page) indiquent le nom du fuseau, `Africa/Casablanca`, au lieu de « heure du Maroc ». | Nom exact et sans ambiguïté, valable toute l'année : un décalage fixe (UTC+1) serait faux pendant le ramadan, quand le Maroc passe à UTC+0. |
+| Version des fichiers publics | Les adresses des styles, scripts et images portent la date de modification du fichier (`?v=…`). | Après une mise à jour, le navigateur charge la nouvelle version au lieu d'une copie gardée en cache. |

@@ -22,7 +22,7 @@ Puis ouvrir <http://localhost:8000>. Prérequis, comptes de démonstration et d�
 | 1 | Modéliser | Fait : modèle, migrations avec contrôles `CHECK`, données de démonstration, back-office |
 | 2 | Faire respecter les règles | Fait : réservation par segments sans surréservation, annulations, avis, tests automatisés |
 | 3 | En faire un produit | Fait : comptes, recherche et réservation, espaces passager et conducteur, profils |
-| 4 | S'ouvrir au monde | Fait : géocodage Nominatim, distances OSRM, prix suggéré, carte OpenStreetMap |
+| 4 | S'ouvrir au monde | Fait : recherche de lieux et géocodage inverse Nominatim, distances OSRM, prix suggéré, carte OpenStreetMap, recherche dans un rayon de 5 km |
 | 5 | Livrer | Fait : installation Docker en une commande et [INSTALL.md](INSTALL.md). Test sur machine vierge : en attente de l'essai sur une machine virtuelle Ubuntu vierge |
 
 ## Ce qui fonctionne
@@ -33,8 +33,8 @@ Puis ouvrir <http://localhost:8000>. Prérequis, comptes de démonstration et d�
 - **Annulations** : le passager jusqu'à deux heures avant le départ de son étape de montée ; le conducteur avant le départ, avec un motif, remboursement simulé et notification des passagers.
 - **Avis** : entre passager et conducteur, après un trajet effectué, dans un délai de 14 jours.
 - **Itinéraire gelé** dès la première réservation ; dates stockées en UTC et affichées à l'heure du Maroc.
-- **Espaces** : recherche par villes et date, réservation, espace passager, espace conducteur (publication, passagers, historique), profils publics, back-office d'administration.
-- **Cartographie** : coordonnées et distances proposées par Nominatim et OSRM sur demande du conducteur, prix suggéré, carte du trajet, dans le respect des politiques d'usage d'OpenStreetMap.
+- **Espaces** : recherche par ville ou lieu précis et date, avec les trajets passant à 5 km au plus, réservation, espace passager, espace conducteur (publication, passagers, historique), profils publics, back-office d'administration.
+- **Cartographie** : publication guidée étape par étape sur une carte (lieux cherchés avec Nominatim ou cliqués, ville de chaque étape déterminée par le serveur, tracé et distances OSRM), prix suggéré, carte du trajet, dans le respect des politiques d'usage d'OpenStreetMap.
 
 ## Limites connues et pistes
 

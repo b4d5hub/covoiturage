@@ -18,7 +18,7 @@ Chaque entité correspond à une table au nom en `snake_case`, à l'exception de
 |---|---|---|
 | Comptes | `User` | Compte unique, avec des rôles. Une même personne peut être conducteur et passager. |
 | | `Vehicle` | Véhicule d'un conducteur et nombre de places proposables, hors conducteur. |
-| Offre | `City` | Ville de la liste gérée depuis le back-office ; sert à la recherche. |
+| Offre | `City` | Localité (ville, commune ou village) identifiée par son objet OpenStreetMap, avec les coordonnées de son centre ; créée à la première publication d'une étape qui s'y trouve ; sert à la recherche. |
 | | `Trip` | Trajet publié : véhicule, capacité, prix complet, état et gel de l'itinéraire. |
 | | `TripStop` | Étape : ville, rang, point de rendez-vous, coordonnées, horaires. |
 | | `TripSegment` | Tronçon entre deux étapes consécutives, avec sa distance en mètres. |
@@ -68,25 +68,29 @@ Aucune clé étrangère ne supprime en cascade : une ligne référencée par une
 
 Les coordonnées sont en `DECIMAL(9,6)`, ce qui couvre toute la plage de longitude avec une précision d'environ 10 cm.
 
+La ville d'une étape est déterminée d'après ses coordonnées : la recherche compare d'abord la ville, puis la distance au point recherché (5 km au plus, calculée par MySQL avec `ST_Distance_Sphere`). Un index sur la latitude et la longitude des étapes écarte rapidement les étapes lointaines. Deux localités peuvent porter le même nom : l'unicité porte sur l'objet OpenStreetMap, pas sur le nom.
+
 Les dates sont stockées et traitées en UTC, ce qui rend les comparaisons insensibles aux changements d'heure du Maroc. La première étape n'a pas d'heure d'arrivée et la dernière n'a pas d'heure de départ.
 
 ## Contraintes en base
 
-Les colonnes facultatives sont les dates d'annulation, de fin, de remboursement et de gel, `arrival_at`, `departure_at`, `trip.cancellation_reason` et `review.comment` ; toutes les autres sont `NOT NULL`.
+Les colonnes facultatives sont les dates d'annulation, de fin, de remboursement et de gel, `arrival_at`, `departure_at`, `trip.cancellation_reason`, `review.comment` et, pour une ville saisie sans OpenStreetMap, son objet OSM et son centre ; toutes les autres sont `NOT NULL`.
 
 Les contraintes d'unicité portent sur les colonnes marquées `UK` et sur ces combinaisons :
 
 | Table | Colonnes uniques ensemble |
 |---|---|
+| `city` | `osm_type`, `osm_id` |
 | `trip_stop` | `trip_id`, `position` |
 | `trip_segment` | `trip_id`, `position` |
 | `review` | `trip_id`, `author_id`, `target_id` |
 
-Les contrôles `CHECK` portent uniquement sur la validité d'une ligne. Ils ne sont pas générés à partir du mapping Doctrine : ils sont écrits à la main dans la migration initiale.
+Les contrôles `CHECK` portent uniquement sur la validité d'une ligne. Ils ne sont pas générés à partir du mapping Doctrine : ils sont écrits à la main dans les migrations.
 
 | Table | Contrôle |
 |---|---|
 | `vehicle` | `passenger_seats > 0` |
+| `city` | `osm_type` parmi `node`, `way`, `relation` ; `osm_type` et `osm_id` renseignés ensemble ; latitude et longitude du centre renseignées ensemble et dans les plages valides |
 | `trip` | `seat_capacity > 0`, `full_price_cents > 0` |
 | `trip_stop` | `position >= 0` ; latitude entre −90 et 90 ; longitude entre −180 et 180 ; au moins un horaire renseigné ; départ postérieur ou égal à l'arrivée |
 | `trip_segment` | `position >= 0`, `distance_meters > 0` |
