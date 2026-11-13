@@ -1,0 +1,48 @@
+{# Thème des formulaires publics : erreurs sous le champ, reliées au champ pour les lecteurs d'écran. #}
+{% use 'form_div_layout.html.twig' %}
+
+{%- block form_row -%}
+    {%- set described = [] -%}
+    {%- if help is not empty -%}{%- set described = described|merge([id ~ '_help']) -%}{%- endif -%}
+    {%- if errors|length > 0 -%}{%- set described = described|merge([id ~ '_errors']) -%}{%- endif -%}
+    {%- set widget_attr = attr -%}
+    {%- if described is not empty and not compound -%}{%- set widget_attr = widget_attr|merge({'aria-describedby': described|join(' ')}) -%}{%- endif -%}
+    {%- if errors|length > 0 and not compound -%}{%- set widget_attr = widget_attr|merge({'aria-invalid': 'true'}) -%}{%- endif -%}
+    {%- set row_class = ('field ' ~ (row_attr.class ?? '') ~ (errors|length > 0 ? ' field--invalid' : ''))|trim -%}
+    <div{% with {attr: row_attr|merge({class: row_class})} %}{{ block('attributes') }}{% endwith %}>
+        {{- form_label(form) -}}
+        {{- form_widget(form, {attr: widget_attr}) -}}
+        {{- form_help(form) -}}
+        {%- if escale_search|default(false) and errors|length > 0 -%}
+            <div class="form-error-below">{{- form_errors(form) -}}</div>
+        {%- else -%}
+            {{- form_errors(form) -}}
+        {%- endif -%}
+    </div>
+{%- endblock form_row -%}
+
+{%- block form_errors -%}
+    {%- if errors|length > 0 -%}
+        <ul class="field-errors" id="{{ id }}_errors">
+            {%- for error in errors -%}<li>{{ error.message }}</li>{%- endfor -%}
+        </ul>
+    {%- endif -%}
+{%- endblock form_errors -%}
+
+{%- block form_help -%}
+    {%- if help is not empty -%}
+        <p id="{{ id }}_help" class="help-text">{{ help|trans(help_translation_parameters, translation_domain) }}</p>
+    {%- endif -%}
+{%- endblock form_help -%}
+
+{# Choix exclusifs affichés comme des boutons (note d'un avis). #}
+{%- block choice_widget_expanded -%}
+    <div {{ block('widget_container_attributes') }}>
+        {%- for child in form -%}
+            <div>
+                {{- form_widget(child) -}}
+                {{- form_label(child, null, {translation_domain: choice_translation_domain}) -}}
+            </div>
+        {%- endfor -%}
+    </div>
+{%- endblock choice_widget_expanded -%}

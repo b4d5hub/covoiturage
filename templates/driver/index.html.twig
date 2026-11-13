@@ -1,77 +1,191 @@
 {% extends 'base.html.twig' %}
+{% import '_ui.html.twig' as ui %}
 
 {% block title %}Espace conducteur – Covoiturage régional{% endblock %}
 
-{% macro trip_card(item) %}
+{% macro trip_card(item, section) %}
+    {% import '_ui.html.twig' as ui %}
     {% set trip = item.trip %}
-    <article class="card">
-        <div class="page-header">
+    {% set lastStop = trip.stopAt(trip.stops|length - 1) %}
+    {% set tones = {published: 'ok', completed: 'info', cancelled: 'danger'} %}
+    <article class="card driver-trip" id="trajet-{{ trip.id }}" aria-labelledby="trip-{{ trip.id }}">
+        <header class="driver-trip-head">
             <div>
-                <p class="route"><a href="{{ path('app_trip_show', {id: trip.id}) }}">{{ trip.routeLabel }}</a> <span class="tag">{{ trip.statusLabel }}</span></p>
-                <p class="muted">Départ le {{ trip.departureAt|date('d/m/Y à H:i') }} · {{ trip.vehicle }} · {{ trip.seatCapacity }} places · {{ trip.fullPriceCents|mad }}</p>
-                {% if item.occupancy is not empty %}
-                    <p class="muted">Places occupées par segment :
-                        {% for position, occupied in item.occupancy %}{{ trip.stopAt(position).city }} → {{ trip.stopAt(position + 1).city }} {{ occupied }}/{{ trip.seatCapacity }}{{ not loop.last ? ' · ' }}{% endfor %}
-                    </p>
+                <h3 class="driver-trip-title" id="trip-{{ trip.id }}">
+                    <a href="{{ path('app_trip_show', {id: trip.id}) }}">{{ trip.routeLabel }}</a>
+                    {% if section == 'toClose' %}
+                        {{ ui.status('À clôturer', 'warn') }}
+                    {% else %}
+                        {{ ui.status(trip.statusLabel, tones[trip.status.value]) }}
+                    {% endif %}
+                </h3>
+                <p class="trip-head-meta small">
+                    <span>{{ ui.icon('calendar') }}{{ trip.departureAt|fr_date('EEE d MMM')|capitalize }}, {{ trip.departureAt|date('H:i') }} – {{ lastStop.arrivalAt|date('H:i') }}</span>
+                    <span>{{ ui.icon('car') }}{{ trip.vehicle }}</span>
+                    <span>{{ ui.icon('seat') }}{{ trip.seatCapacity }} places proposées</span>
+                    <span>{{ ui.icon('ticket') }}{{ trip.fullPriceCents|mad }} le trajet entier</span>
+                    {% if trip.completedAt %}<span>{{ ui.icon('flag') }}Effectué le {{ trip.completedAt|fr_date('d MMMM') }}</span>{% endif %}
+                    {% if trip.cancelledAt %}<span>{{ ui.icon('ban') }}Annulé le {{ trip.cancelledAt|fr_date('d MMMM') }} à {{ trip.cancelledAt|date('H:i') }}</span>{% endif %}
+                </p>
+            </div>
+            <a class="button button-secondary button-small" href="{{ path('app_trip_show', {id: trip.id}) }}">Voir la page du trajet</a>
+        </header>
+
+        {% if trip.cancellationReason %}
+            <p class="callout">{{ ui.icon('ban') }}<span><strong>Motif d'annulation :</strong> {{ trip.cancellationReason }}</span></p>
+        {% endif %}
+
+        <div class="driver-trip-body">
+            {% if item.occupancy is not empty %}
+                <div>
+                    <h4 class="subhead">Places occupées entre les étapes</h4>
+                    <ul class="occupancy">
+                        {% for position, occupied in item.occupancy %}
+                            <li class="occupancy-row">
+                                <span class="occupancy-label">{{ trip.stopAt(position).city }} → {{ trip.stopAt(position + 1).city }}</span>
+                                <span class="occupancy-value">{{ occupied }}/{{ trip.seatCapacity }}</span>
+                                <span class="meter{{ occupied >= trip.seatCapacity ? ' is-full' }}" role="img" aria-label="{{ occupied }} place{{ occupied > 1 ? 's' }} occupée{{ occupied > 1 ? 's' }} sur {{ trip.seatCapacity }}">
+                                    {% for seat in 1..trip.seatCapacity %}<span class="meter-seat{{ seat <= occupied ? ' is-taken' }}"></span>{% endfor %}
+                                </span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+
+            <div{% if item.occupancy is empty %} class="span-all"{% endif %}>
+                <h4 class="subhead">Passagers{% if item.passengers is not empty %} · {{ item.passengers|length }} réservation{{ item.passengers|length > 1 ? 's' }}{% endif %}</h4>
+                {% if item.passengers is not empty %}
+                    <ul class="passengers">
+                        {% for booking in item.passengers %}
+                            <li class="passenger">
+                                <span class="avatar avatar-sm" aria-hidden="true">{{ initials(booking.passenger) }}</span>
+                                <div class="passenger-info">
+                                    <a href="{{ path('app_profile', {id: booking.passenger.id}) }}">{{ booking.passenger.displayName }}</a>
+                                    <span>{{ booking.boardingStop.city }} → {{ booking.alightingStop.city }} · {{ booking.seats }} place{{ booking.seats > 1 ? 's' }}</span>
+                                </div>
+                                {% if booking.passenger in item.reviewable %}
+                                    <a class="button button-secondary button-small" href="{{ path('app_review_new', {id: trip.id, target: booking.passenger.id}) }}">Noter</a>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="muted small">{{ trip.status.value == 'cancelled' ? 'Aucun passager au moment de l\'annulation' : 'Aucun passager pour le moment' }}</p>
                 {% endif %}
-                {% if trip.cancellationReason %}<p class="muted">Motif d'annulation : {{ trip.cancellationReason }}</p>{% endif %}
             </div>
         </div>
 
-        <h3>Passagers</h3>
-        {% for booking in item.passengers %}
-            <p>
-                <a href="{{ path('app_profile', {id: booking.passenger.id}) }}">{{ booking.passenger.displayName }}</a>
-                — {{ booking.boardingStop.city }} → {{ booking.alightingStop.city }}, {{ booking.seats }} place{{ booking.seats > 1 ? 's' }}
-                {% if booking.passenger in item.reviewable %}
-                    · <a href="{{ path('app_review_new', {id: trip.id, target: booking.passenger.id}) }}">Noter</a>
-                {% endif %}
-            </p>
-        {% else %}
-            <p class="muted">Aucun passager.</p>
-        {% endfor %}
+        {% if trip.status.value == 'published' and trip.itineraryFrozen %}
+            <p class="callout">{{ ui.icon('lock') }}<span><strong>Itinéraire verrouillé</strong> : des passagers ont réservé, horaires et étapes ne peuvent plus changer.</span></p>
+        {% endif %}
 
-        <div class="actions">
-            {% if item.canComplete %}
-                <form method="post" action="{{ path('app_driver_complete', {id: trip.id}) }}">
-                    <input type="hidden" name="_token" value="{{ csrf_token('complete-trip-' ~ trip.id) }}">
-                    <button class="button" type="submit">Marquer comme effectué</button>
-                </form>
-            {% endif %}
-            {% if item.canCancel %}
-                <details>
-                    <summary class="button button-secondary">Annuler le trajet</summary>
-                    <form method="post" action="{{ path('app_driver_cancel', {id: trip.id}) }}">
-                        <label for="reason-{{ trip.id }}">Motif (communiqué aux passagers)</label>
-                        <textarea id="reason-{{ trip.id }}" name="reason" required></textarea>
-                        <input type="hidden" name="_token" value="{{ csrf_token('cancel-trip-' ~ trip.id) }}">
-                        <button class="button button-danger" type="submit">Confirmer l'annulation</button>
+        {% if trip.status.value == 'published' %}
+            <div class="card-footer trip-actions">
+                {% if item.canComplete %}
+                    <form method="post" action="{{ path('app_driver_complete', {id: trip.id}) }}"
+                          data-confirm="Confirmez-vous que le trajet {{ trip.routeLabel }} a bien eu lieu ? Vous et vos passagers pourrez ensuite vous noter pendant 14 jours."
+                          data-confirm-title="Marquer comme effectué"
+                          data-confirm-label="Marquer comme effectué">
+                        <input type="hidden" name="_token" value="{{ csrf_token('complete-trip-' ~ trip.id) }}">
+                        <button class="button button-small" type="submit" data-busy-label="Enregistrement…">{{ ui.icon('flag') }}Marquer comme effectué</button>
                     </form>
-                </details>
-            {% endif %}
-        </div>
+                {% elseif section == 'toClose' %}
+                    <p class="note">{{ ui.icon('clock') }}<span>Vous pourrez le marquer comme effectué à partir de l'arrivée prévue, le {{ lastStop.arrivalAt|fr_date('d MMMM') }} à {{ lastStop.arrivalAt|date('H:i') }}. Le trajet a commencé : il ne peut plus être annulé.</span></p>
+                {% endif %}
+
+                {% if item.termsForm is defined and item.termsForm %}
+                    {% set terms = item.termsForm %}
+                    <details class="edit-zone">
+                        <summary class="button button-secondary button-small">{{ ui.icon('edit') }}Modifier places et prix</summary>
+                        {{ form_start(terms, {attr: {class: 'edit-terms'}}) }}
+                            <div class="form-grid">
+                                {{ form_row(terms.seatCapacity, {help: 'Entre ' ~ max(1, item.peak) ~ ' et ' ~ trip.vehicle.passengerSeats ~ ' : jamais moins que les places déjà réservées, jamais plus que celles du véhicule'}) }}
+                                {{ form_row(terms.fullPriceCents, {help: 'Les réservations déjà faites gardent leur prix'}) }}
+                            </div>
+                            <button class="button button-small" type="submit" data-busy-label="Enregistrement…">Enregistrer</button>
+                        {{ form_end(terms) }}
+                    </details>
+                {% endif %}
+
+                {% if item.canCancel %}
+                    <p class="note">{{ ui.icon('info') }}<span>Annulation possible jusqu'au départ. Les passagers sont remboursés et prévenus.</span></p>
+                    <details class="danger-zone">
+                        <summary class="button button-danger-outline button-small">{{ ui.icon('ban') }}Annuler le trajet</summary>
+                        <form method="post" action="{{ path('app_driver_cancel', {id: trip.id}) }}"
+                              data-confirm="Annuler le trajet {{ trip.routeLabel }} ? {{ item.passengers is empty ? 'Il sera retiré des recherches.' : 'Les ' ~ item.passengers|length ~ ' réservation' ~ (item.passengers|length > 1 ? 's seront annulées' : ' sera annulée') ~ ', les paiements simulés remboursés et les passagers prévenus.' }} Cette action est définitive."
+                              data-confirm-title="Annuler le trajet"
+                              data-confirm-label="Annuler le trajet"
+                              data-confirm-tone="danger">
+                            <div class="field">
+                                <label for="reason-{{ trip.id }}">Motif de l'annulation</label>
+                                <textarea id="reason-{{ trip.id }}" name="reason" required aria-describedby="reason-help-{{ trip.id }}"></textarea>
+                                <p class="help-text" id="reason-help-{{ trip.id }}">Obligatoire. Il est communiqué aux passagers.</p>
+                            </div>
+                            <input type="hidden" name="_token" value="{{ csrf_token('cancel-trip-' ~ trip.id) }}">
+                            <div class="cluster">
+                                <button class="button button-danger button-small" type="submit" data-busy-label="Annulation…">Confirmer l'annulation</button>
+                            </div>
+                        </form>
+                    </details>
+                {% endif %}
+            </div>
+        {% endif %}
     </article>
 {% endmacro %}
 
 {% block body %}
-    <header class="page-header">
-        <h1>Espace conducteur</h1>
-        <div class="actions">
-            <a class="button" href="{{ path('app_driver_publish') }}">Publier un trajet</a>
-            <a class="button button-secondary" href="{{ path('app_driver_vehicles') }}">Mes véhicules</a>
-        </div>
-    </header>
+    <div class="container page">
+        <header class="page-head">
+            <div>
+                <h1>Espace conducteur</h1>
+                <p class="muted">Vos trajets publiés, leurs passagers et leur historique.</p>
+            </div>
+            <div class="cluster">
+                <a class="button button-secondary" href="{{ path('app_driver_vehicles') }}">{{ ui.icon('car') }}Mes véhicules</a>
+                <a class="button" href="{{ path('app_driver_publish') }}">{{ ui.icon('plus') }}Publier un trajet</a>
+            </div>
+        </header>
 
-    {% if not hasVehicle %}
-        <p class="card">Pour publier un trajet, <a href="{{ path('app_driver_vehicles') }}">ajoutez d'abord votre véhicule</a>.</p>
-    {% endif %}
+        {% if not hasVehicle %}
+            <div class="flash flash-info">{{ ui.icon('car') }}<div><p class="flash-title">Première étape : votre véhicule</p><p>Pour publier un trajet, <a href="{{ path('app_driver_vehicles') }}">ajoutez d'abord votre véhicule</a> et son nombre de places passagers.</p></div></div>
+        {% endif %}
 
-    <h2>Trajets à venir</h2>
-    {% for item in upcoming %}{{ _self.trip_card(item) }}{% else %}<p class="muted">Aucun trajet à venir.</p>{% endfor %}
+        <nav class="jump-links" aria-label="Aller à une section">
+            <span class="muted">Aller à :</span>
+            <a href="#a-venir">À venir ({{ upcoming|length }})</a>
+            <a href="#a-cloturer">À clôturer ({{ toClose|length }})</a>
+            <a href="#historique">Historique ({{ history|length }})</a>
+        </nav>
 
-    <h2>Trajets partis, à clôturer</h2>
-    {% for item in toClose %}{{ _self.trip_card(item) }}{% else %}<p class="muted">Aucun trajet en attente.</p>{% endfor %}
+        <section id="a-venir" aria-labelledby="upcoming-title">
+            <div class="section-head"><h2 id="upcoming-title">Trajets à venir</h2></div>
+            {% for item in upcoming %}
+                {{ _self.trip_card(item, 'upcoming') }}
+            {% else %}
+                <div class="card">{{ ui.empty('route', 'Aucun trajet à venir', 'Publiez votre prochain trajet avec ses étapes : les passagers pourront réserver tout ou partie du parcours.', hasVehicle ? path('app_driver_publish') : path('app_driver_vehicles'), hasVehicle ? 'Publier un trajet' : 'Ajouter un véhicule', true) }}</div>
+            {% endfor %}
+        </section>
 
-    <h2>Historique</h2>
-    {% for item in history %}{{ _self.trip_card(item) }}{% else %}<p class="muted">Aucun trajet terminé ou annulé.</p>{% endfor %}
+        <section class="section" id="a-cloturer" aria-labelledby="close-title">
+            <div class="section-head">
+                <h2 id="close-title">Trajets partis, à clôturer</h2>
+                <p class="muted small">Marquez un trajet comme effectué après l'arrivée prévue pour ouvrir les avis.</p>
+            </div>
+            {% for item in toClose %}
+                {{ _self.trip_card(item, 'toClose') }}
+            {% else %}
+                <div class="card">{{ ui.empty('flag', 'Aucun trajet en attente', 'Les trajets partis apparaîtront ici jusqu\'à ce que vous les marquiez comme effectués.', null, null, true) }}</div>
+            {% endfor %}
+        </section>
+
+        <section class="section" id="historique" aria-labelledby="history-title">
+            <div class="section-head"><h2 id="history-title">Historique</h2></div>
+            {% for item in history %}
+                {{ _self.trip_card(item, 'history') }}
+            {% else %}
+                <div class="card">{{ ui.empty('inbox', 'Aucun trajet terminé ou annulé', null, null, null, true) }}</div>
+            {% endfor %}
+        </section>
+    </div>
 {% endblock %}

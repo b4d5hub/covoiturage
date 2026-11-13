@@ -1,0 +1,118 @@
+{# Composants d'interface partagés. Import : {% import '_ui.html.twig' as ui %} #}
+
+{% macro auth_logo() %}
+    <img class="auth-logo" src="{{ asset('images/icone-covoiturage.png') }}" width="64" height="64" alt="">
+{% endmacro %}
+
+{# Icônes au trait, décoratives : le texte voisin porte le sens. #}
+{% macro icon(name, class = null) %}
+    {%- set paths = {
+        search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+        calendar: '<rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/>',
+        clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+        pin: '<path d="M19 10c0 5.5-7 11-7 11s-7-5.5-7-11a7 7 0 0 1 14 0Z"/><circle cx="12" cy="10" r="2.5"/>',
+        users: '<path d="M16 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 18.5V20"/><circle cx="10" cy="8" r="3.5"/><path d="M20 20v-1.5a3.5 3.5 0 0 0-2.5-3.35M15.5 4.65a3.5 3.5 0 0 1 0 6.7"/>',
+        user: '<path d="M19 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-7A3.5 3.5 0 0 0 5 18.5V20"/><circle cx="12" cy="8" r="4"/>',
+        seat: '<path d="M5 11V6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5V11"/><path d="M3 13a2 2 0 0 1 4 0v2h10v-2a2 2 0 0 1 4 0v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M6 19v2M18 19v2"/>',
+        car: '<path d="M5 17H3.5a.5.5 0 0 1-.5-.5V13l2-5.2A1.5 1.5 0 0 1 6.4 7h11.2a1.5 1.5 0 0 1 1.4.8L21 13v3.5a.5.5 0 0 1-.5.5H19"/><path d="M3 13h18"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/><path d="M9.5 17h5"/>',
+        star: '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9L12 3Z"/>',
+        bell: '<path d="M6 9a6 6 0 0 1 12 0c0 6.5 2.5 8 2.5 8h-17S6 15.5 6 9"/><path d="M10.3 20.5a2 2 0 0 0 3.4 0"/>',
+        arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+        arrowLeft: '<path d="M19 12H5M11 18l-6-6 6-6"/>',
+        edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+        mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+        check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+        checkCircle: '<circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/>',
+        x: '<path d="M18 6 6 18M6 6l12 12"/>',
+        alert: '<path d="M10.3 4.2 2.6 18a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0Z"/><path d="M12 10v4M12 17.5h.01"/>',
+        info: '<circle cx="12" cy="12" r="9"/><path d="M12 16v-4.5M12 8h.01"/>',
+        plus: '<path d="M12 5v14M5 12h14"/>',
+        trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1V7"/>',
+        route: '<circle cx="6" cy="18.5" r="2.5"/><circle cx="18" cy="5.5" r="2.5"/><path d="M8.5 18.5H17a3.5 3.5 0 0 0 0-7H7a3.5 3.5 0 0 1 0-7h8.5"/>',
+        logout: '<path d="M9 20H5.5A1.5 1.5 0 0 1 4 18.5v-13A1.5 1.5 0 0 1 5.5 4H9M16 16.5l4.5-4.5L16 7.5M20.5 12H9"/>',
+        menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+        chevronDown: '<path d="m6 9 6 6 6-6"/>',
+        chevronUp: '<path d="m18 15-6-6-6 6"/>',
+        lock: '<rect x="4.5" y="11" width="15" height="10" rx="2"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/>',
+        card: '<rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M2.5 10h19M6.5 15h3"/>',
+        ticket: '<path d="M3 9.5V7a1.5 1.5 0 0 1 1.5-1.5h15A1.5 1.5 0 0 1 21 7v2.5a2.5 2.5 0 0 0 0 5V17a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17v-2.5a2.5 2.5 0 0 0 0-5Z"/><path d="M14 5.5v2M14 11v2M14 16.5v2"/>',
+        shield: '<path d="M12 21s7.5-3.5 7.5-9.5V5.5L12 3 4.5 5.5v6C4.5 17.5 12 21 12 21Z"/>',
+        refund: '<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1L3.5 8.5"/><path d="M3.5 3.5v5h5"/>',
+        flag: '<path d="M5 21V4.5M5 15s1.2-1 4-1 4.5 2 7.5 2c2 0 3.5-1 3.5-1V4.5S18.5 5.5 16.5 5.5c-3 0-4.5-2-7.5-2s-4 1-4 1"/>',
+        ban: '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
+        message: '<path d="M20.5 15a2 2 0 0 1-2 2H8l-4.5 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2Z"/>',
+        inbox: '<path d="M21.5 12.5H16l-1.5 2.5h-5L8 12.5H2.5"/><path d="M5.5 5.6 2.5 12.5V18a2 2 0 0 0 2 2h15a2 2 0 0 0 2-2v-5.5l-3-6.9A2 2 0 0 0 17.2 4.5H6.8a2 2 0 0 0-1.3 1.1Z"/>',
+        locate: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/><circle cx="12" cy="12" r="7"/>',
+        map: '<path d="m9 4-5.5 2v14L9 18l6 2 5.5-2V4L15 6 9 4Z"/><path d="M9 4v14M15 6v14"/>',
+        external: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+        wallet: '<path d="M19 7V5.5A1.5 1.5 0 0 0 17.5 4h-12A2.5 2.5 0 0 0 3 6.5v11A2.5 2.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/><path d="M21 9h-5a3 3 0 0 0 0 6h5Z"/>',
+    } -%}
+    <svg class="icon{{ class ? ' ' ~ class }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">{{ paths[name]|raw }}</svg>
+{%- endmacro %}
+
+{# Pastille d'état. tone : ok, warn, danger, info ou neutre. #}
+{% macro status(label, tone = null) %}
+    <span class="status{{ tone ? ' status-' ~ tone }}">{{ label }}</span>
+{%- endmacro %}
+
+{# Message d'information dans la page. type : success, error, info, warning, plain. #}
+{% macro notice(type, message, title = null) %}
+    {%- import _self as ui -%}
+    {%- set icons = {success: 'checkCircle', error: 'alert', info: 'info', warning: 'alert', plain: 'info'} -%}
+    <div class="flash flash-{{ type }}"{% if type == 'error' %} role="alert"{% endif %}>
+        {{ ui.icon(icons[type] ?? 'info') }}
+        <div>
+            {% if title %}<p class="flash-title">{{ title }}</p>{% endif %}
+            <p>{{ message }}</p>
+        </div>
+    </div>
+{%- endmacro %}
+
+{# État vide : icône, titre, explication et action facultative. #}
+{% macro empty(icon, title, text = null, url = null, label = null, compact = false) %}
+    {%- import _self as ui -%}
+    <div class="empty{{ compact ? ' empty-compact' }}">
+        <span class="empty-icon">{{ ui.icon(icon, 'icon-lg') }}</span>
+        <p class="empty-title">{{ title }}</p>
+        {% if text %}<p>{{ text }}</p>{% endif %}
+        {% if url %}<a class="button{{ compact ? ' button-secondary button-small' }}" href="{{ url }}">{{ label }}</a>{% endif %}
+    </div>
+{%- endmacro %}
+
+{# Note moyenne : « ★ 4,5 · 2 avis » ou « Nouveau membre ». #}
+{% macro rating(rating) %}
+    {%- import _self as ui -%}
+    {%- if rating.count > 0 -%}
+        <span class="rating">{{ ui.icon('star') }}{{ rating.average|number_format(1, ',') }}<span class="muted">&nbsp;· {{ rating.count }}&nbsp;avis</span></span>
+    {%- else -%}
+        <span class="muted">Pas encore d'avis</span>
+    {%- endif -%}
+{%- endmacro %}
+
+{# Cinq étoiles pour une note entière. #}
+{% macro stars(value) %}
+    {%- import _self as ui -%}
+    <span class="stars" role="img" aria-label="{{ value }} sur 5">
+        {%- for i in 1..5 -%}{{ ui.icon('star', i <= value ? 'is-on') }}{%- endfor -%}
+    </span>
+{%- endmacro %}
+
+{# « 3 places », « 1 place ». #}
+{% macro seats(count) %}{{ count }} place{{ count != 1 ? "s" }}{% endmacro %}
+
+{% macro button(label, options = {}) %}
+    {% set classes = 'button button-' ~ (options.variant|default('primary')) ~ (options.block|default(false) ? ' button-block') %}
+    {% if options.href is defined %}
+        <a class="{{ classes }}" href="{{ options.href }}">{% if options.icon is defined %}{{ _self.icon(options.icon) }}{% endif %}{{ label }}</a>
+    {% else %}
+        <button class="{{ classes }}" type="submit"{% if options.busy is defined %} data-busy-label="{{ options.busy }}"{% endif %}{% if options.booking|default(false) %} data-booking-submit{% endif %}>{% if options.icon is defined %}{{ _self.icon(options.icon) }}{% endif %}{{ label }}</button>
+    {% endif %}
+{% endmacro %}
+
+{% macro availability(count, fullLabel = 'Complet entre ces étapes') %}
+    {% if count > 0 %}
+        {{ _self.status(_self.seats(count)|trim ~ (count == 1 ? ' libre' : ' libres'), count == 1 ? 'warn' : 'ok') }}
+    {% else %}
+        {{ _self.status(fullLabel, 'danger') }}
+    {% endif %}
+{% endmacro %}

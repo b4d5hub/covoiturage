@@ -1,0 +1,67 @@
+/* Raccord du thème EasyAdmin aux jetons Couleurs d’escale. */
+:root, .ea-dark-scheme {
+    --font-family-sans-serif: var(--escale-font-ui);
+    --font-size-adjust: none;
+    --ea-radius: .5rem;
+    --sidebar-bg: var(--escale-action);
+    --sidebar-border-color: var(--escale-aubergine-hover);
+    --sidebar-logo-color: var(--escale-on-action);
+    --sidebar-menu-color: var(--escale-on-action);
+    --sidebar-menu-submenu-color: var(--escale-lilas);
+    --sidebar-menu-header-color: var(--escale-ligne);
+    --sidebar-menu-icon-color: var(--escale-lilas);
+    --sidebar-menu-hover-color: var(--escale-on-action);
+    --sidebar-item-hover-bg: var(--escale-aubergine-hover);
+    --sidebar-item-icon-tile-hover-bg: var(--escale-aubergine-hover);
+    --sidebar-menu-active-item-bg: var(--escale-selection);
+    --sidebar-menu-active-item-color: var(--escale-action);
+    --responsive-header-bg: var(--escale-action);
+    --responsive-header-border-color: var(--escale-aubergine-hover);
+    --responsive-header-logo-color: var(--escale-on-action);
+}
+
+:root {
+    --ea-primary: var(--escale-action);
+    --ea-primary-foreground: var(--escale-on-action);
+    --text-color: var(--escale-aubergine);
+    --text-muted: var(--escale-prune);
+    --body-bg: var(--escale-ivoire);
+    --content-bg: var(--escale-blanc);
+    --main-content-border-color: var(--escale-ligne);
+    --content-top-border-color: var(--escale-ligne);
+    --content-section-border-color: var(--escale-ligne);
+    --content-search-bg: var(--escale-lilas);
+    --form-control-bg: var(--escale-blanc);
+    --form-input-border-color: var(--escale-ligne-forte);
+    --form-input-focus-border-color: var(--escale-focus);
+    --form-focus-ring-color: color-mix(in srgb, var(--escale-focus) 30%, transparent);
+    --form-input-placeholder-color: var(--escale-prune);
+    --form-input-error-border-color: var(--escale-invalid);
+    --modal-bg: var(--escale-blanc);
+    --modal-header-bg: var(--escale-lilas);
+}
+
+.ea-dark-scheme {
+    --ea-primary: var(--escale-selection);
+    --ea-primary-foreground: var(--escale-action);
+    --body-bg: var(--escale-nuit);
+    --content-bg: var(--escale-nuit);
+    --content-search-bg: color-mix(in srgb, var(--escale-nuit) 70%, var(--escale-aubergine-hover));
+    --content-search-icon-color: var(--escale-ligne);
+    --responsive-table-label-color: var(--escale-ligne);
+}
+
+.content-header h1 { font-family: var(--escale-font-title); }
+.admin-brand { display: inline-block; width: 2.75rem; height: 2.75rem; vertical-align: middle; background: url("../images/logo-covoiturage.png") center / contain no-repeat; }
+.responsive-header :is(button, .responsive-header-menu-button) { color: var(--escale-on-action); }
+.ea-dark-scheme .content-search input::placeholder { color: var(--escale-ligne); }
+.admin-tag { display: block; margin-top: 4px; font-size: .75rem; font-weight: 600; color: var(--sidebar-menu-header-color); }
+.ea-sidebar-group-label { text-transform: none; }
+.datagrid { font-variant-numeric: tabular-nums; }
+.datagrid tbody tr:focus-within > * { background-color: var(--table-hover-cell-bg); }
+.field-datetime input[type="datetime-local"].form-control,
+.field-date input[type="date"].form-control,
+.field-time input[type="time"].form-control {
+    border-radius: var(--escale-control-radius);
+    font-variant-numeric: tabular-nums;
+}

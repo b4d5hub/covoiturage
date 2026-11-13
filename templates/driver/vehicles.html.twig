@@ -1,27 +1,52 @@
 {% extends 'base.html.twig' %}
+{% import '_ui.html.twig' as ui %}
 
 {% block title %}Mes véhicules – Covoiturage régional{% endblock %}
 
 {% block body %}
-    <h1>Mes véhicules</h1>
+    <div class="container container-narrow page">
+        <header class="page-head">
+            <div>
+                <h1>Mes véhicules</h1>
+                <p class="muted">Publier un trajet demande un véhicule : le nombre de places proposées ne peut pas dépasser ses places passagers.</p>
+            </div>
+            {% if vehicles is not empty %}
+                <a class="button" href="{{ path('app_driver_publish') }}">{{ ui.icon('plus') }}Publier un trajet</a>
+            {% endif %}
+        </header>
 
-    <section class="card">
-        {% for vehicle in vehicles %}
-            <p>{{ vehicle }} · {{ vehicle.passengerSeats }} places passagers</p>
-        {% else %}
-            <p class="muted">Aucun véhicule enregistré.</p>
-        {% endfor %}
-    </section>
+        <section class="card" aria-labelledby="vehicles-title">
+            <h2 class="card-title" id="vehicles-title">{{ ui.icon('car') }}Véhicules enregistrés</h2>
+            {% if vehicles is not empty %}
+                <ul class="vehicle-list">
+                    {% for vehicle in vehicles %}
+                        <li class="vehicle">
+                            <span class="vehicle-icon">{{ ui.icon('car') }}</span>
+                            <div>
+                                <p class="vehicle-name">{{ vehicle }}</p>
+                                <p class="small muted">{{ vehicle.passengerSeats }} place{{ vehicle.passengerSeats > 1 ? 's' }} passager{{ vehicle.passengerSeats > 1 ? 's' }}, hors conducteur</p>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                {{ ui.empty('car', 'Aucun véhicule enregistré', 'Ajoutez le véhicule avec lequel vous voyagez pour pouvoir publier un trajet.', null, null, true) }}
+            {% endif %}
+        </section>
 
-    <section class="card narrow">
-        <h2>Ajouter un véhicule</h2>
-        {{ form_start(form) }}
-            {{ form_widget(form) }}
-            <button class="button" type="submit">Ajouter</button>
-        {{ form_end(form) }}
-    </section>
-
-    {% if vehicles is not empty %}
-        <p><a class="button" href="{{ path('app_driver_publish') }}">Publier un trajet</a></p>
-    {% endif %}
+        <section class="card" aria-labelledby="add-vehicle-title">
+            <h2 class="card-title" id="add-vehicle-title">{{ ui.icon('plus') }}Ajouter un véhicule</h2>
+            {{ form_start(form) }}
+                {{ form_errors(form) }}
+                <div class="form-grid">
+                    {{ form_row(form.brand, {attr: {placeholder: 'Dacia'}}) }}
+                    {{ form_row(form.model, {attr: {placeholder: 'Logan'}}) }}
+                    {{ form_row(form.passengerSeats) }}
+                </div>
+                <div class="form-actions">
+                    <button class="button" type="submit" data-busy-label="Ajout…">Ajouter le véhicule</button>
+                </div>
+            {{ form_end(form) }}
+        </section>
+    </div>
 {% endblock %}

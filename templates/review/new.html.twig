@@ -1,17 +1,37 @@
 {% extends 'base.html.twig' %}
+{% import '_ui.html.twig' as ui %}
 
 {% block title %}Laisser un avis – Covoiturage régional{% endblock %}
 
 {% block body %}
-    <section class="card narrow">
-        <h1>Avis sur {{ target.displayName }}</h1>
-        <p class="muted">Trajet {{ trip.routeLabel }} du {{ trip.departureAt|date('d/m/Y') }}. Un seul avis par personne et par trajet, dans les 14 jours qui suivent sa fin.</p>
+    {% set targetIsDriver = target is same as(trip.driver) %}
+    <div class="container container-narrow page">
+        <section class="card card-narrow">
+            <h1>Donner votre avis</h1>
+            <div class="person review-target">
+                <span class="avatar" aria-hidden="true">{{ initials(target) }}</span>
+                <div>
+                    <p class="person-name">{{ target.displayName }} <span class="muted">({{ targetIsDriver ? 'conducteur' : 'passager' }})</span></p>
+                    <p class="person-meta">Trajet {{ trip.routeLabel }} du {{ trip.departureAt|fr_date('d MMMM y') }}</p>
+                </div>
+            </div>
 
-        {{ form_start(form) }}
-            {{ form_errors(form) }}
-            {{ form_row(form.rating) }}
-            {{ form_row(form.comment) }}
-            <button class="button" type="submit">Publier l'avis</button>
-        {{ form_end(form) }}
-    </section>
+            {{ form_start(form) }}
+                {% if form.vars.errors|length > 0 %}
+                    <div class="flash flash-error form-errors" role="alert">{{ ui.icon('alert') }}<div>{{ form_errors(form) }}</div></div>
+                {% endif %}
+                <fieldset class="field{{ form.rating.vars.errors|length > 0 ? ' field--invalid' }}">
+                    <legend>Note</legend>
+                    {{ form_widget(form.rating, {attr: {class: 'rating-input'}}) }}
+                    {{ form_errors(form.rating) }}
+                </fieldset>
+                {{ form_row(form.comment, {attr: {placeholder: 'Ponctualité, conduite, ambiance…', rows: 4}}) }}
+                <p class="note">{{ ui.icon('info') }}<span>Votre avis sera publié sur le profil de {{ target.displayName }}. Un seul avis par personne et par trajet, dans les 14 jours qui suivent sa fin.</span></p>
+                <div class="form-actions">
+                    <button class="button" type="submit" data-busy-label="Publication…">Publier l'avis</button>
+                    <a class="button button-ghost" href="{{ path(app.user is same as(trip.driver) ? 'app_driver' : 'app_my_bookings') }}">Annuler</a>
+                </div>
+            {{ form_end(form) }}
+        </section>
+    </div>
 {% endblock %}

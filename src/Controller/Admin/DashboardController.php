@@ -11,7 +11,9 @@ use App\Entity\Trip;
 use App\Entity\User;
 use App\Entity\Vehicle;
 use App\Time\MoroccoTime;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Asset;
 use EasyCorp\Bundle\EasyAdminBundle\Attribute\AdminDashboard;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Assets;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Dashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Config\MenuItem;
@@ -28,7 +30,19 @@ final class DashboardController extends AbstractDashboardController
 
     public function configureDashboard(): Dashboard
     {
-        return Dashboard::new()->setTitle('Covoiturage régional');
+        return Dashboard::new()
+            ->setFaviconPath('favicon.ico')
+            ->setTitle('<span class="admin-brand"><span class="visually-hidden">Covoiturage régional</span></span> <small class="admin-tag">Administration</small>');
+    }
+
+    public function configureAssets(): Assets
+    {
+        // Couleurs de l'application publique, pour une identité commune.
+        return Assets::new()
+            ->addCssFile('css/escale-tokens.css')
+            ->addCssFile('css/admin.css')
+            ->addCssFile('css/date-time-picker.css')
+            ->addJsFile(Asset::new('js/date-time-picker.js')->defer());
     }
 
     public function configureCrud(): Crud
@@ -41,6 +55,7 @@ final class DashboardController extends AbstractDashboardController
 
     public function configureMenuItems(): iterable
     {
+        yield MenuItem::linkToUrl('Retour au site', 'fa fa-arrow-left', $this->generateUrl('app_home'));
         yield MenuItem::section('Offre');
         yield MenuItem::linkTo(TripCrudController::class, 'Trajets', 'fa fa-route');
         yield MenuItem::linkTo(CityCrudController::class, 'Villes', 'fa fa-city');

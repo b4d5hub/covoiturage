@@ -5,6 +5,11 @@ framework:
     # Note that the session will be started ONLY if you read or write from it.
     session: true
 
+    # Les adresses des fichiers publics portent leur date de modification : après une mise à jour,
+    # le navigateur charge la nouvelle version au lieu de celle gardée en cache.
+    assets:
+        version_strategy: App\Asset\FileVersionStrategy
+
     #esi: true
     #fragments: true
 

@@ -20,3 +20,6 @@
 /phpunit.xml
 /.phpunit.cache/
 ###< phpunit/phpunit ###
+
+# Réglages locaux de l'IDE
+/.idea/

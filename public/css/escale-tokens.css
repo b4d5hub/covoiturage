@@ -1,0 +1,44 @@
+@font-face {
+    font-family: Chivo;
+    src: url("../fonts/Chivo-Variable.ttf") format("truetype");
+    font-weight: 100 900;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Rethink Sans";
+    src: url("../fonts/RethinkSans-Variable.ttf") format("truetype");
+    font-weight: 400 800;
+    font-display: swap;
+}
+
+:root {
+    --escale-aubergine: #381845;
+    --escale-aubergine-hover: #52245e;
+    --escale-citron: #f5e978;
+    --escale-ivoire: #fffaf2;
+    --escale-lilas: #f6eaf1;
+    --escale-blanc: #fffdf9;
+    --escale-prune: #635366;
+    --escale-nuit: #24182b;
+    --escale-ligne: #d7c3d0;
+    --escale-ligne-forte: #8d7186;
+    --escale-focus: #733c87;
+    --escale-ok: #194b35;
+    --escale-ok-soft: #e1eee3;
+    --escale-warn: #604000;
+    --escale-warn-soft: #ffedc2;
+    --escale-danger: #812946;
+    --escale-danger-hover: #662139;
+    --escale-danger-soft: #f9e1e7;
+    --escale-danger-line: #c994a5;
+    --escale-invalid: #9e3150;
+    --escale-action: var(--escale-aubergine);
+    --escale-selection: var(--escale-citron);
+    --escale-on-action: var(--escale-ivoire);
+    --escale-radius: 1rem;
+    --escale-control-radius: .625rem;
+    --escale-gutter: clamp(1rem, 3vw, 2rem);
+    --escale-font-title: Chivo, system-ui, sans-serif;
+    --escale-font-ui: "Rethink Sans", system-ui, sans-serif;
+}

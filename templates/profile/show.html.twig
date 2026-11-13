@@ -1,37 +1,61 @@
 {% extends 'base.html.twig' %}
+{% import '_ui.html.twig' as ui %}
 
 {% block title %}{{ member.displayName }} – Covoiturage régional{% endblock %}
 
 {% block body %}
-    <header class="page-header">
-        <div>
-            <h1>{{ member.displayName }}</h1>
-            <p class="muted">Membre depuis {{ member.createdAt|date('m/Y') }}</p>
-        </div>
-        <div class="card rating">
-            {% if rating.count > 0 %}
-                <p class="price">{{ rating.average|number_format(1, ',') }}/5</p>
-                <p class="muted">{{ rating.count }} avis reçu{{ rating.count > 1 ? 's' }}</p>
-            {% else %}
-                <p class="muted">Pas encore d'avis</p>
+    {% set isMe = app.user and app.user.id == member.id %}
+    <div class="container container-narrow page">
+        <section class="card">
+            <div class="profile-head">
+                <div class="profile-id">
+                    <span class="avatar avatar-lg" aria-hidden="true">{{ initials(member) }}</span>
+                    <div>
+                        <h1>{{ member.displayName }}</h1>
+                        <p class="muted">Membre depuis {{ member.createdAt|fr_date('MMMM y') }}</p>
+                    </div>
+                </div>
+                <dl class="profile-stats">
+                    <div>
+                        <dt class="stat-label">Note moyenne</dt>
+                        <dd class="stat-value">{% if rating.count > 0 %}{{ rating.average|number_format(1, ',') }}/5{% else %}–{% endif %}</dd>
+                        <dd class="stat-label">{% if rating.count > 0 %}{{ rating.count }} avis reçu{{ rating.count > 1 ? 's' }}{% else %}Pas encore d'avis{% endif %}</dd>
+                    </div>
+                    <div>
+                        <dt class="stat-label">Comme conducteur</dt>
+                        <dd class="stat-value">{{ tripsAsDriver }}</dd>
+                        <dd class="stat-label">trajet{{ tripsAsDriver > 1 ? 's' }} effectué{{ tripsAsDriver > 1 ? 's' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="stat-label">Comme passager</dt>
+                        <dd class="stat-value">{{ tripsAsPassenger }}</dd>
+                        <dd class="stat-label">trajet{{ tripsAsPassenger > 1 ? 's' }} effectué{{ tripsAsPassenger > 1 ? 's' }}</dd>
+                    </div>
+                </dl>
+            </div>
+            {% if isMe %}
+                <p class="callout">{{ ui.icon('info') }}<span>C'est votre profil tel que les autres membres le voient : prénom, initiale du nom, notes et avis. Votre adresse e-mail n'est jamais affichée.</span></p>
             {% endif %}
-        </div>
-    </header>
+        </section>
 
-    <p class="muted">{{ tripsAsDriver }} trajet{{ tripsAsDriver > 1 ? 's' }} effectué{{ tripsAsDriver > 1 ? 's' }} comme conducteur · {{ tripsAsPassenger }} comme passager</p>
-
-    <h2>Avis reçus</h2>
-    {% for review in reviews %}
-        <article class="card">
-            <p>
-                <strong>{{ review.rating }}/5</strong>
-                · <a href="{{ path('app_profile', {id: review.author.id}) }}">{{ review.author.displayName }}</a>
-                ({{ review.author is same as(review.trip.driver) ? 'conducteur' : 'passager' }})
-                · <span class="muted">{{ review.trip.routeLabel }}, {{ review.createdAt|date('d/m/Y') }}</span>
-            </p>
-            {% if review.comment %}<p>{{ review.comment }}</p>{% endif %}
-        </article>
-    {% else %}
-        <p class="muted">Aucun avis pour le moment.</p>
-    {% endfor %}
+        <section class="section" aria-labelledby="reviews-title">
+            <div class="section-head">
+                <h2 id="reviews-title">Avis reçus</h2>
+                <p class="muted small">Déposés après un trajet effectué, entre conducteur et passagers.</p>
+            </div>
+            {% for review in reviews %}
+                <article class="card review-item">
+                    <div class="review-head">
+                        {{ ui.stars(review.rating) }}
+                        <strong>{{ review.rating }}/5</strong>
+                        <span>par <a href="{{ path('app_profile', {id: review.author.id}) }}">{{ review.author.displayName }}</a> ({{ review.author is same as(review.trip.driver) ? 'conducteur' : 'passager' }})</span>
+                    </div>
+                    {% if review.comment %}<p class="review-comment">{{ review.comment }}</p>{% endif %}
+                    <p class="review-context">Trajet {{ review.trip.routeLabel }} · {{ review.createdAt|fr_date('d MMMM y') }}</p>
+                </article>
+            {% else %}
+                <div class="card">{{ ui.empty('star', 'Aucun avis pour le moment', isMe ? 'Les avis apparaissent après vos trajets effectués, comme conducteur ou comme passager.' : null, null, null, true) }}</div>
+            {% endfor %}
+        </section>
+    </div>
 {% endblock %}

@@ -1,48 +1,132 @@
+{% import '_ui.html.twig' as ui %}
 <!DOCTYPE html>
 <html lang="fr">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="description" content="Covoiturage entre les villes du Maroc : réservez une place sur tout ou partie du trajet d'un conducteur.">
         <title>{% block title %}Covoiturage régional{% endblock %}</title>
+        <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="16x16 32x32 48x48">
+        <script>document.documentElement.classList.add('js');</script>
         <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+        <link rel="stylesheet" href="{{ asset('css/escale-tokens.css') }}">
+        <link rel="stylesheet" href="{{ asset('css/escale.css') }}">
+        <link rel="stylesheet" href="{{ asset('css/date-time-picker.css') }}">
         {% block stylesheets %}{% endblock %}
     </head>
-    <body>
+    <body class="escale {% block body_class %}escale-app{% endblock %}">
+        <a class="skip-link" href="#contenu">Aller au contenu</a>
+
+        {% set current_route = app.request.attributes.get('_route') %}
+        {% macro nav_link(route, label, current_route, icon = null) %}
+            {% import '_ui.html.twig' as ui %}
+            <a class="nav-link" href="{{ path(route) }}"{% if route == current_route %} aria-current="page"{% endif %}>{% if icon %}{{ ui.icon(icon) }}{% endif %}{{ label }}</a>
+        {% endmacro %}
+
         <header class="site-header">
             <div class="container header-inner">
-                <a class="brand" href="{{ path('app_home') }}">Covoiturage régional</a>
-                <nav class="main-nav" aria-label="Navigation principale">
-                    <a href="{{ path('app_home') }}">Rechercher</a>
-                    {% if app.user %}
-                        <a href="{{ path('app_driver_publish') }}">Publier un trajet</a>
-                        <a href="{{ path('app_my_bookings') }}">Mes réservations</a>
-                        <a href="{{ path('app_driver') }}">Espace conducteur</a>
-                        {% set unread = unread_notifications() %}
-                        <a href="{{ path('app_notifications') }}">Notifications{% if unread > 0 %} <span class="badge">{{ unread }}</span>{% endif %}</a>
-                        <a href="{{ path('app_my_profile') }}">Mon profil</a>
-                        {% if is_granted('ROLE_ADMIN') %}<a href="{{ path('admin') }}">Administration</a>{% endif %}
-                        <a href="{{ path('app_logout') }}">Déconnexion</a>
-                    {% else %}
-                        <a href="{{ path('app_login') }}">Connexion</a>
-                        <a class="button button-small" href="{{ path('app_register') }}">Inscription</a>
-                    {% endif %}
+                <a class="brand" href="{{ path('app_home') }}" aria-label="Accueil – Covoiturage régional">
+                    <img class="site-logo" src="{{ asset('images/logo-entete.png') }}" width="660" height="220" alt="">
+                </a>
+
+                <a class="escale-publish" href="{{ path('app_driver_publish') }}"{% if current_route == 'app_driver_publish' %} aria-current="page"{% endif %}>Publier<span class="visually-hidden"> un trajet</span></a>
+                {% set unread = app.user ? unread_notifications() : 0 %}
+                <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-nav-toggle>
+                    {{ ui.icon('menu') }}<span>Menu</span>
+                    {% if unread > 0 %}<span class="nav-bubble" aria-hidden="true"></span>{% endif %}
+                </button>
+
+                <nav class="site-nav" id="site-nav" aria-label="Navigation principale">
+                    <ul class="nav-links">
+                        <li>{{ _self.nav_link('app_home', 'Rechercher', current_route) }}</li>
+                        <li class="nav-publish">{{ _self.nav_link('app_driver_publish', 'Publier un trajet', current_route) }}</li>
+                        {% if app.user %}
+                            <li>{{ _self.nav_link('app_my_bookings', 'Mes réservations', current_route) }}</li>
+                            <li>{{ _self.nav_link('app_driver', 'Espace conducteur', current_route) }}</li>
+                        {% endif %}
+                    </ul>
+
+                    <div class="nav-account">
+                        {% if app.user %}
+                            {# Sans JavaScript, la cloche mène à la page des notifications ;
+                               sinon elle ouvre un aperçu des dernières notifications. #}
+                            <div class="notif" data-notif data-src="{{ path('app_notifications_preview') }}">
+                                <a class="nav-link nav-bell" href="{{ path('app_notifications') }}" data-notif-toggle aria-controls="notif-panel" aria-expanded="false"{% if current_route == 'app_notifications' %} aria-current="page"{% endif %}>
+                                    {{ ui.icon('bell') }}<span class="nav-bell-label">Notifications</span>
+                                    {% if unread > 0 %}<span class="badge" aria-label="{{ unread }} non lue{{ unread > 1 ? 's' }}">{{ unread }}</span>{% endif %}
+                                </a>
+                                <div class="notif-panel" id="notif-panel" data-notif-panel hidden></div>
+                            </div>
+                            <div class="menu" data-menu>
+                                <button class="menu-button" type="button" aria-expanded="false" aria-controls="account-menu" data-menu-button>
+                                    <span class="avatar avatar-sm" aria-hidden="true">{{ initials(app.user) }}</span>
+                                    <span class="menu-name">{{ app.user.firstName }}</span><span class="visually-hidden">Menu du compte</span>{{ ui.icon('chevronDown') }}
+                                </button>
+                                <ul class="menu-panel" id="account-menu">
+                                    <li class="menu-heading"><strong>{{ app.user.displayName }}</strong><br><span class="small muted">{{ app.user.email }}</span></li>
+                                    <li>{{ _self.nav_link('app_account', 'Mon compte', current_route, 'user') }}</li>
+                                    <li><a class="nav-link" href="{{ path('app_my_profile') }}"{% if current_route == 'app_profile' and app.request.attributes.get('id') == app.user.id %} aria-current="page"{% endif %}>{{ ui.icon('star') }}Mon profil public</a></li>
+                                    <li>{{ _self.nav_link('app_driver_vehicles', 'Mes véhicules', current_route, 'car') }}</li>
+                                    {% if is_granted('ROLE_ADMIN') %}<li><a class="nav-link" href="{{ path('admin') }}">{{ ui.icon('shield') }}Administration</a></li>{% endif %}
+                                    <li><a class="nav-link" href="{{ path('app_logout') }}">{{ ui.icon('logout') }}Déconnexion</a></li>
+                                </ul>
+                            </div>
+                        {% else %}
+                            {{ _self.nav_link('app_login', 'Connexion', current_route) }}
+                            <a class="button button-small" href="{{ path('app_register') }}"{% if current_route == 'app_register' %} aria-current="page"{% endif %}>Inscription</a>
+                        {% endif %}
+                    </div>
                 </nav>
             </div>
         </header>
 
-        <main class="container">
-            {% for type, messages in app.flashes %}
-                {% for message in messages %}
-                    <div class="flash flash-{{ type }}" role="status">{{ message }}</div>
-                {% endfor %}
-            {% endfor %}
+        <main id="contenu" tabindex="-1">
+            {% set flashes = app.flashes %}
+            {% if flashes is not empty %}
+                <div class="container flashes">
+                    {% for type, messages in flashes %}
+                        {% for message in messages %}
+                            <div class="flash flash-{{ type }}" role="{{ type == 'error' ? 'alert' : 'status' }}">
+                                {{ ui.icon(type == 'success' ? 'checkCircle' : (type == 'error' ? 'alert' : 'info')) }}
+                                <p>{{ message }}</p>
+                            </div>
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+            {% endif %}
 
             {% block body %}{% endblock %}
         </main>
 
         <footer class="site-footer">
-            <div class="container">Paiement simulé : aucun paiement réel n'est effectué. Les personnes et trajets de démonstration sont fictifs.</div>
+            <div class="container footer-inner">
+                <a class="brand" href="{{ path('app_home') }}" aria-label="Accueil – Covoiturage régional">
+                    <img class="footer-logo" src="{{ asset('images/logo-pied-de-page.png') }}" width="660" height="220" alt="">
+                </a>
+                <ul class="footer-links">
+                    <li><a href="{{ path('app_home') }}">Rechercher un trajet</a></li>
+                    <li><a href="{{ path('app_driver_publish') }}">Publier un trajet</a></li>
+                    {% if not app.user %}<li><a href="{{ path('app_register') }}">Créer un compte</a></li>{% endif %}
+                </ul>
+                <p class="footer-note">{{ ui.icon('info') }}<span>Paiement simulé : aucun paiement réel n'est effectué. Les personnes et trajets de démonstration sont fictifs. Horaires affichés dans le fuseau {{ timezone }}.</span></p>
+            </div>
         </footer>
+
+        <dialog class="dialog" id="confirm-dialog" aria-labelledby="confirm-title">
+            <form method="dialog">
+                <div class="dialog-body">
+                    <h2 class="dialog-title" id="confirm-title">Confirmer</h2>
+                    <p data-confirm-message></p>
+                </div>
+                <div class="dialog-actions">
+                    <button class="button button-secondary" value="cancel" data-confirm-cancel>Retour</button>
+                    <button class="button" value="confirm" data-confirm-accept>Confirmer</button>
+                </div>
+            </form>
+        </dialog>
+
+        <script src="{{ asset('js/app.js') }}" defer></script>
+        <script src="{{ asset('js/date-time-picker.js') }}" defer></script>
         {% block javascripts %}{% endblock %}
     </body>
 </html>

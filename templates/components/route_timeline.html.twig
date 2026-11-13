@@ -1,0 +1,46 @@
+{# Les étapes sont ordonnées par position ; la portion peut être absente. #}
+{% set fromPos = boarding ? boarding.position : null %}
+{% set toPos = alighting ? alighting.position : null %}
+{% set hasPortion = boarding and alighting %}
+<ol class="route-line{{ hasPortion ? ' has-portion' }}{{ compact ? ' route-line-compact' }}"{% if not compact %} data-route-line aria-describedby="itinerary-hint"{% endif %}>
+    {% for stop in stops %}
+        {% set isBoarding = hasPortion and stop.position == fromPos %}
+        {% set isAlighting = hasPortion and stop.position == toPos %}
+        {% set inPortion = hasPortion and stop.position >= fromPos and stop.position <= toPos %}
+        {% set at = loop.first ? stop.departureAt : stop.arrivalAt %}
+        {% set segment = not compact and not loop.last ? trip.segmentAt(stop.position) : null %}
+        <li class="rl-stop{{ inPortion ? ' in-portion' }}{{ isBoarding ? ' is-boarding' }}{{ isAlighting ? ' is-alighting' }}"{% if not compact %} data-stop-id="{{ stop.id }}" data-city="{{ stop.city }}"{% endif %}>
+            <div class="rl-time">
+                <time datetime="{{ at|date('c') }}">{{ at|date('H:i') }}</time>
+                {% if not compact %}
+                    <small>{{ loop.first ? 'départ' : (loop.last ? 'arrivée' : 'départ ' ~ stop.departureAt|date('H:i')) }}</small>
+                {% endif %}
+            </div>
+            <div class="rl-dot" aria-hidden="true"></div>
+            <div class="rl-place">
+                <div class="rl-city">{{ stop.city }}{% if at|date('Ymd') != trip.departureAt|date('Ymd') %} <span class="muted small">· {{ at|fr_date('d MMM') }}</span>{% endif %}</div>
+                <div class="rl-address">{{ stop.meetingAddress }}</div>
+                <div class="rl-role"{% if not compact %} data-role-label{% endif %}>{{ isBoarding ? 'Vous montez ici' : (isAlighting ? 'Vous descendez ici' : (hasPortion and stop.position > toPos ? 'Suite du trajet' : '')) }}</div>
+                {% if segment %}<span class="rl-leg">{{ segment.distanceMeters|km }} jusqu'à {{ stops[loop.index].city }}</span>{% endif %}
+                {% if offers is defined and offers %}
+                    {# Après l'étape de montée : prix et places depuis cette montée, et « Descendre ici ».
+                       Avant elle (ou sans montée choisie) : « Monter ici ». Liens simples, utilisables sans JavaScript. #}
+                    {% set offer = hasPortion and stop.position > fromPos ? offers.portions|filter(p => p.boarding.id == boarding.id and p.alighting.id == stop.id)|first : null %}
+                    {% set canBoardHere = offers.canPick and not loop.last and (not hasPortion or stop.position < fromPos)
+                        and offers.portions|filter(p => p.boarding.id == stop.id and p.open and p.available > 0)|length > 0 %}
+                    <div class="rl-offer" data-stop-offer>
+                        {% if offer %}
+                            <span class="rl-offer-price">{{ not offer.open ? 'Départ passé' : (offer.available > 0 ? offer.seatPrice|mad : 'Complet') }}</span>
+                            {% if offer.open and offer.available > 0 %}<span class="rl-offer-seats">{{ offer.available }} place{{ offer.available > 1 ? 's' }} libre{{ offer.available > 1 ? 's' }}</span>{% endif %}
+                            {% if offers.canPick and offer.open and offer.available > 0 and not isAlighting %}
+                                <a class="rl-offer-pick" href="{{ path('app_trip_show', {id: trip.id, depart: boarding.id, arrivee: stop.id}) }}#reserver" data-pick-alighting="{{ stop.id }}">Descendre ici</a>
+                            {% endif %}
+                        {% elseif canBoardHere %}
+                            <a class="rl-offer-pick" href="{{ path('app_trip_show', {id: trip.id, depart: stop.id, arrivee: (hasPortion ? alighting : offers.lastStop).id}) }}#reserver" data-pick-boarding="{{ stop.id }}">Monter ici</a>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+        </li>
+    {% endfor %}
+</ol>

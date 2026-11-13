@@ -1,17 +1,44 @@
 {% extends 'base.html.twig' %}
+{% import '_ui.html.twig' as ui %}
 
 {% block title %}Inscription – Covoiturage régional{% endblock %}
 
 {% block body %}
-    <section class="card narrow">
-        <h1>Créer un compte</h1>
-        <p class="muted">Un seul compte pour voyager comme passager et publier vos trajets comme conducteur.</p>
+    <div class="container auth">
+        <section class="card auth-card">
+            <div class="auth-head">
+                {{ ui.auth_logo() }}
+                <h1>Créer un compte</h1>
+                <p class="muted">Un seul compte pour voyager comme passager et publier vos trajets comme conducteur.</p>
+            </div>
 
-        {{ form_start(form) }}
-            {{ form_widget(form) }}
-            <button class="button" type="submit">Créer mon compte</button>
-        {{ form_end(form) }}
+            {% if booking %}
+                {% include 'security/_booking_handoff.html.twig' %}
+            {% else %}
+                <ul class="auth-perks">
+                <li>{{ ui.icon('check') }}<span>Réservez une place sur tout ou partie d'un trajet.</span></li>
+                <li>{{ ui.icon('check') }}<span>Publiez vos trajets dès que vous avez enregistré votre véhicule.</span></li>
+                <li>{{ ui.icon('check') }}<span>Les autres membres ne voient que votre prénom et l'initiale de votre nom.</span></li>
+                </ul>
+            {% endif %}
 
-        <p class="muted">Déjà inscrit ? <a href="{{ path('app_login') }}">Se connecter</a></p>
-    </section>
+            {{ form_start(form, {action: path('app_register', booking ? booking.parameters : {})}) }}
+                {% if form.vars.errors|length > 0 %}
+                    <div class="flash flash-error form-errors" role="alert">{{ ui.icon('alert') }}<div>{{ form_errors(form) }}</div></div>
+                {% endif %}
+                <div class="form-grid">
+                    {{ form_row(form.firstName) }}
+                    {{ form_row(form.lastName) }}
+                </div>
+                {{ form_row(form.email) }}
+                {{ form_row(form.plainPassword.first) }}
+                {{ form_row(form.plainPassword.second) }}
+                {{ form_errors(form.plainPassword) }}
+                {{ form_rest(form) }}
+                {{ ui.button('Créer mon compte', {block: true, busy: 'Création du compte…'}) }}
+            {{ form_end(form) }}
+
+            <p class="auth-foot">Vous avez déjà un compte ? <a href="{{ path('app_login', booking ? booking.parameters : {}) }}">Se connecter</a></p>
+        </section>
+    </div>
 {% endblock %}

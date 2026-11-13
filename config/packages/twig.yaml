@@ -1,8 +1,12 @@
 twig:
     file_name_pattern: '*.twig'
+    form_themes: ['form/theme.html.twig']
     # Les dates sont stockées en UTC et affichées à l'heure du Maroc.
     date:
         timezone: Africa/Casablanca
+    globals:
+        # Fuseau horaire affiché à côté des heures saisies ou lues.
+        timezone: !php/const App\Time\MoroccoTime::ZONE
 
 when@test:
     twig:

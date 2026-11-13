@@ -17,14 +17,22 @@ final class RegistrationType extends AbstractType
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
-            ->add('firstName', TextType::class, ['label' => 'Prénom'])
-            ->add('lastName', TextType::class, ['label' => 'Nom'])
-            ->add('email', EmailType::class, ['label' => 'Adresse e-mail'])
+            ->add('firstName', TextType::class, ['label' => 'Prénom', 'attr' => ['autocomplete' => 'given-name']])
+            ->add('lastName', TextType::class, [
+                'label' => 'Nom',
+                'help' => 'Seule l\'initiale de votre nom est affichée aux autres membres',
+                'attr' => ['autocomplete' => 'family-name'],
+            ])
+            ->add('email', EmailType::class, ['label' => 'Adresse e-mail', 'attr' => ['autocomplete' => 'email']])
             ->add('plainPassword', RepeatedType::class, [
                 'type' => PasswordType::class,
                 'mapped' => false,
-                'first_options' => ['label' => 'Mot de passe'],
-                'second_options' => ['label' => 'Confirmation du mot de passe'],
+                'first_options' => [
+                    'label' => 'Mot de passe',
+                    'help' => '8 caractères au minimum',
+                    'attr' => ['autocomplete' => 'new-password', 'minlength' => 8],
+                ],
+                'second_options' => ['label' => 'Confirmation du mot de passe', 'attr' => ['autocomplete' => 'new-password']],
                 'invalid_message' => 'Les deux mots de passe ne correspondent pas.',
                 'constraints' => [
                     new Assert\NotBlank(message: 'Choisissez un mot de passe.'),
