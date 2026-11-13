@@ -2,8 +2,8 @@
 
 namespace App\Tests\Unit;
 
-use App\Entity\City;
 use App\Geo\Coordinates;
+use App\Geo\GeoServiceUnavailable;
 use App\Geo\NominatimGeocoder;
 use App\Geo\OsrmRouter;
 use App\Geo\PriceSuggester;
@@ -48,57 +48,137 @@ final class GeoServicesTest extends TestCase
         return new OsrmRouter($this->client($responses, 'https://osrm.example'), new ArrayAdapter(), $this->limiter('osrm'), new NullLogger());
     }
 
-    private function city(): City
+    /** @param array<string, mixed> $extra */
+    private static function nominatimResult(string $name, string $display, string $addresstype = 'city', array $extra = []): array
     {
-        return (new City())->setName('Agadir');
+        return $extra + ['osm_type' => 'relation', 'osm_id' => 2799215, 'lat' => '34.0218454', 'lon' => '-6.8408929', 'name' => $name, 'display_name' => $display, 'addresstype' => $addresstype];
     }
 
-    public function testGeocodingQueriesMoroccoAndReturnsCoordinates(): void
+    /** @return array<string, string> */
+    private function query(int $index = 0): array
     {
-        $result = $this->geocoder([new MockResponse('[{"lat":"30.413","lon":"-9.557"}]')])->geocode('Gare routière', $this->city());
+        parse_str((string) parse_url($this->urls[$index], \PHP_URL_QUERY), $query);
 
-        self::assertEquals(new Coordinates('30.413000', '-9.557000'), $result);
-        parse_str((string) parse_url($this->urls[0], \PHP_URL_QUERY), $query);
+        return $query;
+    }
+
+    private function point(): Coordinates
+    {
+        return new Coordinates('34.014000', '-6.836000');
+    }
+
+    public function testPlaceSearchIsLimitedToMoroccoInFrenchAndCleansTheAddress(): void
+    {
+        $places = $this->geocoder([new MockResponse(json_encode([
+            self::nominatimResult('Casa Voyageurs', 'Casa Voyageurs, Parvis de la Gare, Arrondissement des Roches noires, Pachalik de Casablanca, Préfecture de Casablanca, Casablanca-Settat, 20250, Maroc', 'railway', ['osm_type' => 'node', 'osm_id' => 7055155496, 'lat' => '33.5903571', 'lon' => '-7.5896645']),
+        ]))])->search('  Casa   Voyageurs ');
+
         self::assertStringStartsWith('https://nominatim.example/search', $this->urls[0]);
-        self::assertSame('Gare routière, Agadir, Maroc', $query['q']);
-        self::assertSame('ma', $query['countrycodes']);
-        self::assertSame('1', $query['limit']);
+        self::assertSame(['q' => 'Casa Voyageurs', 'format' => 'jsonv2', 'limit' => '5', 'countrycodes' => 'ma', 'accept-language' => 'fr'], $this->query());
+        self::assertCount(1, $places);
+        self::assertSame('Casa Voyageurs', $places[0]->name);
+        self::assertSame('Casa Voyageurs, Parvis de la Gare', $places[0]->address);
+        self::assertEquals(new Coordinates('33.590357', '-7.589664'), $places[0]->point);
+        self::assertSame(['node', '7055155496'], [$places[0]->osmType, $places[0]->osmId]);
     }
 
-    public function testGeocodingResultsAreCached(): void
+    public function testDuplicatePlacesAreShownOnce(): void
     {
-        $geocoder = $this->geocoder([new MockResponse('[{"lat":"30.413","lon":"-9.557"}]')]);
+        $station = self::nominatimResult('Gare Routière', 'Gare Routière, Avenue Abderrahim Bouabid, Agadir, Souss-Massa, Maroc', 'amenity');
+        $places = $this->geocoder([new MockResponse(json_encode([$station, ['osm_type' => 'way', 'osm_id' => 1] + $station, self::nominatimResult('Agadir', 'Agadir, Souss-Massa, Maroc')]))])->search('Gare routière Agadir');
 
-        $geocoder->geocode('Gare routière', $this->city());
-        $second = $geocoder->geocode('  GARE ROUTIÈRE ', $this->city());
+        self::assertSame(['Gare Routière', 'Agadir'], array_map(static fn ($place) => $place->name, $places));
+    }
+
+    public function testSearchResultsAreCachedRegardlessOfCaseAndSpacing(): void
+    {
+        $geocoder = $this->geocoder([new MockResponse(json_encode([self::nominatimResult('Rabat', 'Rabat, Maroc')]))]);
+
+        $geocoder->search('Rabat');
+        $second = $geocoder->search('  RABAT ');
 
         self::assertCount(1, $this->urls);
-        self::assertNotNull($second);
+        self::assertCount(1, $second);
     }
 
-    public function testAddressNotFoundReturnsNullAndIsCached(): void
+    public function testNoResultIsAnEmptyListAndIsCached(): void
     {
         $geocoder = $this->geocoder([new MockResponse('[]')]);
 
-        self::assertNull($geocoder->geocode('Adresse inconnue', $this->city()));
-        self::assertNull($geocoder->geocode('Adresse inconnue', $this->city()));
+        self::assertSame([], $geocoder->search('Lieu inconnu'));
+        self::assertSame([], $geocoder->search('Lieu inconnu'));
         self::assertCount(1, $this->urls);
     }
 
-    public function testUnavailableServiceReturnsNullAndIsNotCached(): void
+    public function testUnavailableServiceThrowsAndIsNotCached(): void
     {
-        $geocoder = $this->geocoder([new MockResponse('', ['http_code' => 503]), new MockResponse('[{"lat":"30.4","lon":"-9.5"}]')]);
+        $geocoder = $this->geocoder([new MockResponse('', ['http_code' => 503]), new MockResponse(json_encode([self::nominatimResult('Rabat', 'Rabat, Maroc')]))]);
 
-        self::assertNull($geocoder->geocode('Gare routière', $this->city()));
-        self::assertNotNull($geocoder->geocode('Gare routière', $this->city()));
+        try {
+            $geocoder->search('Rabat');
+            self::fail('Une indisponibilité doit être signalée.');
+        } catch (GeoServiceUnavailable) {
+        }
+
+        self::assertCount(1, $geocoder->search('Rabat'));
         self::assertCount(2, $this->urls);
     }
 
-    public function testNetworkFailureReturnsNull(): void
+    public function testNetworkFailureIsReportedAsUnavailable(): void
     {
-        $geocoder = $this->geocoder([new MockResponse('', ['error' => 'Connexion impossible'])]);
+        $this->expectException(GeoServiceUnavailable::class);
 
-        self::assertNull($geocoder->geocode('Gare routière', $this->city()));
+        $this->geocoder([new MockResponse('', ['error' => 'Connexion impossible'])])->localityAt($this->point());
+    }
+
+    public function testLocalityUsesReverseGeocodingAtTownLevel(): void
+    {
+        $locality = $this->geocoder([new MockResponse(json_encode(self::nominatimResult('Rabat', 'Rabat, Maroc', 'city', ['address' => ['country_code' => 'ma']])))])->localityAt($this->point());
+
+        self::assertStringStartsWith('https://nominatim.example/reverse', $this->urls[0]);
+        self::assertSame(['lat' => '34.014000', 'lon' => '-6.836000', 'zoom' => '10', 'format' => 'jsonv2', 'addressdetails' => '1', 'accept-language' => 'fr'], $this->query());
+        self::assertSame('Rabat', $locality->name);
+        self::assertSame(['relation', '2799215'], [$locality->osmType, $locality->osmId]);
+        self::assertEquals(new Coordinates('34.021845', '-6.840893'), $locality->point);
+    }
+
+    #[TestWith(['Pachalik de Safi', 'Safi'])]
+    #[TestWith(['pachalik d\'El Jadida', 'El Jadida'])]
+    #[TestWith(['Commune rurale de Jouala', 'Jouala'])]
+    #[TestWith(['Rabat', 'Rabat'])]
+    public function testAdministrativePrefixesAreRemovedFromLocalityNames(string $name, string $expected): void
+    {
+        $locality = $this->geocoder([new MockResponse(json_encode(self::nominatimResult($name, $name.', Maroc', 'city', ['address' => ['country_code' => 'ma']])))])->localityAt($this->point());
+
+        self::assertSame($expected, $locality->name);
+    }
+
+    #[TestWith(['state', 'ma'])]
+    #[TestWith(['suburb', 'ma'])]
+    #[TestWith(['city', 'dz'])]
+    public function testPointOutsideAMoroccanLocalityHasNoLocality(string $addresstype, string $country): void
+    {
+        $result = self::nominatimResult('Ailleurs', 'Ailleurs', $addresstype, ['address' => ['country_code' => $country]]);
+
+        self::assertNull($this->geocoder([new MockResponse(json_encode($result))])->localityAt($this->point()));
+    }
+
+    public function testUnableToGeocodeMeansNoLocalityAndIsCached(): void
+    {
+        $geocoder = $this->geocoder([new MockResponse('{"error":"Unable to geocode"}')]);
+
+        self::assertNull($geocoder->localityAt($this->point()));
+        self::assertNull($geocoder->localityAt($this->point()));
+        self::assertCount(1, $this->urls);
+    }
+
+    public function testPlaceAtNamesTheExactPointClicked(): void
+    {
+        $place = $this->geocoder([new MockResponse(json_encode(self::nominatimResult('Gare de Rabat-Ville', 'Gare de Rabat-Ville, Avenue Mohammed V, Hassan, Rabat, Pachalik de Rabat, Rabat-Salé-Kénitra, 10000, Maroc', 'railway', ['address' => ['country_code' => 'ma']])))])->placeAt($this->point());
+
+        self::assertSame('18', $this->query()['zoom']);
+        self::assertSame('Gare de Rabat-Ville', $place->name);
+        self::assertSame('Gare de Rabat-Ville, Avenue Mohammed V, Hassan, Rabat', $place->address);
     }
 
     public function testRequestsAreSpacedByAtLeastOneSecond(): void
@@ -106,8 +186,8 @@ final class GeoServicesTest extends TestCase
         $geocoder = $this->geocoder([new MockResponse('[]'), new MockResponse('[]')]);
 
         $start = microtime(true);
-        $geocoder->geocode('Première adresse', $this->city());
-        $geocoder->geocode('Seconde adresse', $this->city());
+        $geocoder->search('Premier lieu');
+        $geocoder->search('Second lieu');
 
         self::assertGreaterThanOrEqual(0.9, microtime(true) - $start);
     }

@@ -17,4 +17,10 @@ final readonly class Coordinates
     {
         return new self(\sprintf('%.6F', $latitude), \sprintf('%.6F', $longitude));
     }
+
+    /** @return array{latitude: string, longitude: string} */
+    public function toArray(): array
+    {
+        return ['latitude' => $this->latitude, 'longitude' => $this->longitude];
+    }
 }

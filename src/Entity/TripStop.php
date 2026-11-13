@@ -12,6 +12,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Entity]
 #[ORM\UniqueConstraint(name: 'uniq_trip_stop_position', columns: ['trip_id', 'position'])]
 #[ORM\Index(name: 'idx_trip_stop_city_departure', columns: ['city_id', 'departure_at'])]
+#[ORM\Index(name: 'idx_trip_stop_coordinates', columns: ['latitude', 'longitude'])]
 class TripStop
 {
     #[ORM\Id]

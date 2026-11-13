@@ -20,7 +20,7 @@ final class SchemaConstraintsTest extends DatabaseTestCase
         $now = "'2026-12-01 07:00:00'";
         $this->connection->executeStatement("INSERT INTO app_user (id, email, password, roles, first_name, last_name, created_at) VALUES
             (1, 'a@example.test', 'x', '[]', 'A', 'A', $now), (2, 'b@example.test', 'x', '[]', 'B', 'B', $now)");
-        $this->connection->executeStatement("INSERT INTO city (id, name) VALUES (1, 'Agadir'), (2, 'Marrakech')");
+        $this->connection->executeStatement("INSERT INTO city (id, name, osm_type, osm_id, latitude, longitude) VALUES (1, 'Agadir', 'relation', 2529624, 30.420516, -9.583853), (2, 'Marrakech', 'relation', 2799538, 31.625826, -7.989161)");
         $this->connection->executeStatement('INSERT INTO vehicle (id, owner_id, brand, model, passenger_seats) VALUES (1, 1, \'Dacia\', \'Logan\', 4)');
         $this->connection->executeStatement("INSERT INTO trip (id, vehicle_id, seat_capacity, full_price_cents, status, created_at) VALUES (1, 1, 3, 20000, 'published', $now)");
         $this->connection->executeStatement("INSERT INTO trip_stop (id, trip_id, city_id, position, meeting_address, latitude, longitude, arrival_at, departure_at) VALUES
@@ -57,6 +57,10 @@ final class SchemaConstraintsTest extends DatabaseTestCase
         yield 'note trop basse' => ['chk_review_rating', 'UPDATE review SET rating = 0'];
         yield 'note trop haute' => ['chk_review_rating', 'UPDATE review SET rating = 6'];
         yield 'auteur égal au destinataire' => ['chk_review_distinct_users', 'UPDATE review SET target_id = author_id'];
+        yield 'type d\'objet OSM' => ['chk_city_osm_type', "UPDATE city SET osm_type = 'area' WHERE id = 1"];
+        yield 'objet OSM incomplet' => ['chk_city_osm_pair', 'UPDATE city SET osm_id = NULL WHERE id = 1'];
+        yield 'centre incomplet' => ['chk_city_centre_pair', 'UPDATE city SET longitude = NULL WHERE id = 1'];
+        yield 'centre hors limites' => ['chk_city_centre_range', 'UPDATE city SET latitude = 91 WHERE id = 1'];
     }
 
     #[DataProvider('checkViolations')]
@@ -71,7 +75,8 @@ final class SchemaConstraintsTest extends DatabaseTestCase
     public static function uniqueViolations(): iterable
     {
         yield 'e-mail' => ["UPDATE app_user SET email = 'a@example.test' WHERE id = 2"];
-        yield 'ville' => ["UPDATE city SET name = 'Agadir' WHERE id = 2"];
+        // Deux localités peuvent porter le même nom ; leur objet OpenStreetMap, lui, est unique.
+        yield 'ville OpenStreetMap' => ['UPDATE city SET osm_id = 2529624 WHERE id = 2'];
         yield 'rang d\'étape' => ['UPDATE trip_stop SET position = 0 WHERE id = 2'];
         yield 'rang de segment' => ["INSERT INTO trip_segment (trip_id, position, distance_meters) VALUES (1, 0, 1000)"];
         yield 'second paiement' => ["INSERT INTO payment (booking_id, amount_cents, status, paid_at) VALUES (1, 2000, 'paid', '2026-12-01 07:00:00')"];

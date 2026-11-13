@@ -36,6 +36,23 @@ final class DemoDataTest extends DatabaseTestCase
         $this->allBookings = $this->em->getRepository(Booking::class)->findAll();
     }
 
+    public function testEveryCityIsAnOpenStreetMapLocalityContainingItsStops(): void
+    {
+        $cities = $this->connection->fetchAllAssociative('SELECT id, osm_type, osm_id, latitude, longitude FROM city');
+
+        self::assertCount(12, $cities);
+
+        foreach ($cities as $city) {
+            self::assertSame('relation', $city['osm_type']);
+            self::assertNotNull($city['osm_id']);
+            self::assertNotNull($city['latitude']);
+        }
+
+        // Chaque point de rendez-vous est à moins de 5 km du centre de sa ville : la recherche le retrouve aussi par rayon.
+        $farthest = (float) $this->connection->fetchOne('SELECT MAX(ST_Distance_Sphere(POINT(s.longitude, s.latitude), POINT(c.longitude, c.latitude))) FROM trip_stop s JOIN city c ON c.id = s.city_id');
+        self::assertLessThan(5000, $farthest);
+    }
+
     public function testContainsEveryExpectedKindOfData(): void
     {
         $statuses = array_map(fn (Trip $trip) => $trip->getStatus(), $this->trips);

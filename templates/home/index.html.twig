@@ -1,62 +1,233 @@
 {% extends 'base.html.twig' %}
+{% import '_ui.html.twig' as ui %}
+
+{% block body_class %}escale-home{{ results is not null ? ' escale-search' }}{% endblock %}
+
+{% macro result_card(result, index) %}
+    {% import '_ui.html.twig' as ui %}
+    {% set trip = result.trip %}
+    {% set boarding = result.boarding %}
+    {% set alighting = result.alighting %}
+    {% set mine = app.user and trip.driver is same as(app.user) %}
+    <article class="card result{{ result.available < 1 or mine ? ' is-unavailable' }}" aria-labelledby="result-{{ index }}">
+        <h3 class="visually-hidden" id="result-{{ index }}">{{ boarding.city }} → {{ alighting.city }}, départ à {{ boarding.departureAt|date('H:i') }}</h3>
+        <div class="escale-fare">
+            <p class="price">{{ result.seatPrice|mad }}<span class="price-unit">par place</span></p>
+            {{ mine ? ui.status('Votre trajet', 'info') : ui.availability(result.available) }}
+        </div>
+        <div class="result-main">
+            {% include 'components/route_timeline.html.twig' with {stops: [boarding, alighting], boarding: boarding, alighting: alighting, trip: trip, compact: true} only %}
+            <p class="escale-continuation">{{ ui.icon('route') }} <span>Trajet entier : <strong>{{ trip.routeLabel }}</strong> · <span class="escale-duration">{{ duration(boarding.departureAt, alighting.arrivalAt) }}</span> pour vous</span></p>
+            {% if result.showBoardingDistance and result.boardingMeters is not null and result.boardingMeters >= 100 %}
+                <p class="note">{{ ui.icon('pin') }}<span>Point de départ à {{ result.boardingMeters|short_km }} {{ result.fromLabel|de }}</span></p>
+            {% endif %}
+        </div>
+        <div class="escale-result-action">
+            {% set link = path('app_trip_show', {id: trip.id, depart: boarding.id, arrivee: alighting.id}) %}
+            {% if mine %}
+                {{ ui.button('Voir mon trajet', {href: path('app_trip_show', {id: trip.id}), variant: 'secondary'}) }}
+            {% elseif result.available > 0 %}
+                {{ ui.button('Voir et réserver', {href: link}) }}
+            {% else %}
+                {{ ui.button('Voir le trajet', {href: link, variant: 'secondary'}) }}
+            {% endif %}
+        </div>
+        <div class="result-meta">
+            <span><span class="avatar avatar-sm" aria-hidden="true">{{ initials(trip.driver) }}</span>{{ trip.driver.displayName }}</span>
+            <span>{{ ui.rating(result.driverRating) }}</span>
+            <span>{{ ui.icon('car') }}{{ trip.vehicle }}</span>
+        </div>
+    </article>
+{% endmacro %}
 
 {% block body %}
-    <section class="hero">
-        <h1>Voyagez entre les villes du Maroc</h1>
-        <p>Réservez une place sur tout ou partie du trajet d'un conducteur.</p>
-
-        {{ form_start(form, {attr: {class: 'search-form'}}) }}
-            {{ form_row(form.from) }}
-            {{ form_row(form.to) }}
-            {{ form_row(form.date) }}
-            <button class="button" type="submit">Rechercher</button>
-        {{ form_end(form) }}
-    </section>
-
-    {% if results is not null %}
-        <section>
-            <h2>{{ results|length }} trajet{{ results|length > 1 ? 's' }} trouvé{{ results|length > 1 ? 's' }}</h2>
-
-            {% for result in results %}
-                {% set trip = result.trip %}
-                <article class="card trip-card">
-                    <div class="trip-main">
-                        <p class="route">{{ result.boarding.city }} <span aria-hidden="true">→</span> {{ result.alighting.city }}</p>
-                        <p class="muted">
-                            Départ le {{ result.boarding.departureAt|date('d/m/Y à H:i') }}, arrivée à {{ result.alighting.arrivalAt|date('H:i') }}
-                            · Trajet complet : {{ trip.routeLabel }}
-                        </p>
-                        <p class="muted">Conducteur : {{ trip.driver.displayName }} · {{ trip.vehicle }}</p>
-                    </div>
-                    <div class="trip-side">
-                        <p class="price">{{ result.seatPrice|mad }}</p>
-                        <p class="muted">par place</p>
-                        {% if result.available > 0 %}
-                            <p>{{ result.available }} place{{ result.available > 1 ? 's' }} libre{{ result.available > 1 ? 's' }}</p>
-                            <a class="button" href="{{ path('app_trip_show', {id: trip.id, depart: result.boarding.id, arrivee: result.alighting.id}) }}">Voir et réserver</a>
-                        {% else %}
-                            <p class="tag tag-muted">Complet sur cette portion</p>
-                        {% endif %}
-                    </div>
-                </article>
+    <section class="escale-hero">
+        <div class="container">
+            {% if results is null %}
+                <h1>On part d'où<span class="escale-question"> ?</span></h1>
+                <p class="lead">Covoiturez entre les villes du Maroc, d'une étape à l'autre. Le prix suit la distance.</p>
             {% else %}
-                <p class="card muted">Aucun trajet ne correspond à cette recherche. Essayez une autre date.</p>
-            {% endfor %}
-        </section>
-    {% else %}
-        <section>
-            <h2>Prochains départs</h2>
-            <div class="grid">
-                {% for trip in upcoming %}
-                    <a class="card trip-link" href="{{ path('app_trip_show', {id: trip.id}) }}">
-                        <p class="route">{{ trip.routeLabel }}</p>
-                        <p class="muted">{{ trip.departureAt|date('d/m/Y à H:i') }} · {{ trip.stops|length }} étapes</p>
-                        <p>{{ trip.fullPriceCents|mad }} le trajet complet</p>
-                    </a>
-                {% else %}
-                    <p class="muted">Aucun départ prévu pour le moment.</p>
+                <h1>Rechercher un trajet</h1>
+            {% endif %}
+
+                <div class="search-card">
+                    {{ form_start(form, {attr: {class: 'search-form', id: 'recherche', role: 'search', 'aria-label': 'Rechercher un trajet'}}) }}
+                        {{ form_row(form.from, {escale_search: true}) }}
+                        {{ form_row(form.to, {escale_search: true}) }}
+                        {{ form_row(form.date, {escale_search: true}) }}
+                        {{ ui.button('Rechercher', {busy: 'Recherche…', icon: 'search'}) }}
+                        <datalist id="known-cities">
+                            {% for city in knownCities %}<option value="{{ city.name }}"></option>{% endfor %}
+                        </datalist>
+                    {{ form_end(form) }}
+                    <p class="search-hint">Une ville ou un lieu précis : les trajets qui passent à 5 km au plus sont aussi proposés.</p>
+                </div>
+        </div>
+    </section>
+    <div class="container">
+        {% if featured and results is null %}
+            <section class="escale-featured" aria-label="Prochain départ">
+                {% set trip = featured.trip %}
+                <div class="escale-map-frame">
+                    <div class="escale-home-map" id="home-map" aria-hidden="true" data-tiles="{{ map_tile_url }}" data-map="{{ featuredMap|json_encode|e('html_attr') }}"></div>
+                    <p class="hero-map-credit">{{ featuredMap.approximate ? 'Tracé approximatif' : 'Itinéraire OSRM' }} · © <a href="https://www.openstreetmap.org/copyright">contributeurs OpenStreetMap</a></p>
+                </div>
+                <a class="next-departure" href="{{ path('app_trip_show', {id: trip.id}) }}">
+                    <span class="next-label">Prochain départ</span>
+                    <span class="next-main">
+                        <span class="next-title">{{ trip.routeLabel }}</span>
+                        <span class="next-meta">
+                            <span>{{ trip.departureAt|fr_date('EEE d MMM')|capitalize }}, {{ trip.departureAt|date('H:i') }}</span>
+                            <span>{{ trip.stops|length }} étapes</span>
+                            <span>{{ featured.availableEndToEnd }} place{{ featured.availableEndToEnd > 1 ? 's' }} libre{{ featured.availableEndToEnd > 1 ? 's' }} du départ à l'arrivée</span>
+                        </span>
+                    </span>
+                    <span class="next-price">{{ trip.fullPriceCents|mad }}</span>
+                    <span class="next-go" aria-hidden="true">{{ ui.icon('arrow') }}</span>
+                </a>
+            </section>
+        {% endif %}
+        {% if results is not null %}
+            {% set bookable = results|filter(r => r.available > 0 and r.trip.driver is not same as(app.user)) %}
+            {% set others = results|filter(r => not (r.available > 0 and r.trip.driver is not same as(app.user))) %}
+            <section class="section" aria-labelledby="results-title">
+                <div class="section-head">
+                    <div>
+                        <h2 id="results-title">
+                            {%- if bookable is not empty -%}
+                                {{ bookable|length }} trajet{{ bookable|length > 1 ? 's' }} disponible{{ bookable|length > 1 ? 's' }}
+                            {%- elseif others is not empty -%}
+                                Aucune place disponible
+                            {%- else -%}
+                                Aucun trajet
+                            {%- endif -%}
+                        </h2>
+                        <p class="muted">{{ searchFrom.label }} → {{ searchTo.label }} · {{ searchDate|fr_date('EEEE d MMMM y')|capitalize }}</p>
+                    </div>
+                </div>
+
+                {% for result in bookable %}
+                    {{ _self.result_card(result, loop.index) }}
                 {% endfor %}
-            </div>
-        </section>
+                {% if bookable is not empty %}
+                    <p class="note note-spaced">{{ ui.icon('info') }}<span>Prix par place entre vos deux villes, calculé selon la distance</span></p>
+                {% endif %}
+
+                {% if results is empty %}
+                    <div class="card">
+                        <div class="empty">
+                            <span class="empty-icon">{{ ui.icon('search', 'icon-lg') }}</span>
+                            <p class="empty-title">Aucun trajet ce jour-là</p>
+                            <p>Aucun conducteur ne passe près {{ searchFrom.label|de }} puis {{ searchTo.label|de }} à cette date. Les trajets qui s'arrêtent en chemin dans ces villes ou à 5 km au plus sont aussi recherchés.</p>
+                            {{ ui.button('Modifier la recherche', {href: '#recherche', variant: 'secondary'}) }}
+                            {% if otherDays is not empty %}
+                                <p>Essayez une autre date :
+                                    {% for day in otherDays -%}
+                                        <a href="{{ path('app_home', {from: day.from, to: day.to, date: day.date}) }}">{{ date(day.date ~ ' 12:00')|fr_date('EEEE d MMMM') }}</a>{{ not loop.last ? ' ou ' }}
+                                    {%- endfor %}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% if others is not empty %}
+                    <h3 class="results-subhead">Complets ou non réservables</h3>
+                    {% for result in others %}
+                        {{ _self.result_card(result, bookable|length + loop.index) }}
+                    {% endfor %}
+                {% endif %}
+            </section>
+        {% else %}
+            {% set others = upcoming|filter(u => featured is null or u.trip is not same as(featured.trip)) %}
+            {% if others is not empty %}
+                <section class="section" aria-labelledby="upcoming-title">
+                    <div class="section-head">
+                        <h2 id="upcoming-title">Autres départs</h2>
+                        <p class="muted small">Prix du trajet entier ; vous pouvez monter ou descendre à chaque étape</p>
+                    </div>
+                    <ol class="card board">
+                        {% for item in others %}
+                            {% set trip = item.trip %}
+                            <li>
+                                <a class="board-row" href="{{ path('app_trip_show', {id: trip.id}) }}">
+                                    <span class="board-when">
+                                        <time class="board-time" datetime="{{ trip.departureAt|date('c') }}">{{ trip.departureAt|date('H:i') }}</time>
+                                        <span class="board-day">{{ trip.departureAt|fr_date('EEE d MMM')|capitalize }}</span>
+                                    </span>
+                                    <span class="board-route">
+                                        <span class="board-title">{{ trip.routeLabel }}</span>
+                                        <span class="board-meta">{{ trip.stops|length }} étapes</span>
+                                    </span>
+                                    {% if item.availableEndToEnd > 0 %}
+                                        <span class="seats board-seats">{{ item.availableEndToEnd }} place{{ item.availableEndToEnd > 1 ? 's' }} libre{{ item.availableEndToEnd > 1 ? 's' }} du départ à l'arrivée</span>
+                                    {% else %}
+                                        <span class="seats seats-low board-seats">Complet du départ à l'arrivée, des places peuvent rester entre certaines étapes</span>
+                                    {% endif %}
+                                    <span class="board-price">{{ trip.fullPriceCents|mad }}</span>
+                                    {{ ui.icon('arrow', 'board-arrow') }}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ol>
+                </section>
+            {% elseif upcoming is empty %}
+                <section class="section">
+                    <div class="card">{{ ui.empty('calendar', 'Aucun départ prévu pour le moment', 'Les trajets publiés par les conducteurs apparaîtront ici.', path('app_driver_publish'), 'Publier un trajet') }}</div>
+                </section>
+            {% endif %}
+
+            <section class="section how" aria-labelledby="how-title">
+                <div>
+                    <h2 id="how-title">Comment ça marche</h2>
+                    <p class="muted">Vous montez et descendez où vous voulez sur le parcours d'un conducteur, et le prix suit la distance.</p>
+                </div>
+                <ol class="how-steps">
+                    <li>
+                        <span class="how-number" aria-hidden="true">1</span>
+                        <div>
+                            <h3>Cherchez votre trajet</h3>
+                            <p>Indiquez vos villes et votre date. Les conducteurs qui passent par vos villes en chemin sont aussi proposés.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="how-number" aria-hidden="true">2</span>
+                        <div>
+                            <h3>Réservez vos places</h3>
+                            <p>Le prix dépend de la distance parcourue. La réservation est confirmée immédiatement, avec un paiement simulé.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="how-number" aria-hidden="true">3</span>
+                        <div>
+                            <h3>Voyagez, puis donnez votre avis</h3>
+                            <p>Annulation possible jusqu'à 2 heures avant votre départ, avec remboursement intégral. Après le trajet, conducteur et passagers se notent.</p>
+                        </div>
+                    </li>
+                </ol>
+            </section>
+
+            <section class="section">
+                <div class="card driver-cta">
+                    <div>
+                        <h2>Vous prenez la route ?</h2>
+                        <p class="muted">Publiez votre trajet avec ses étapes. Les distances et un prix suggéré peuvent être calculés à partir de l'itinéraire routier ; vous restez libre de votre prix.</p>
+                    </div>
+                    {{ ui.button('Publier un trajet', {href: path('app_driver_publish')}) }}
+                </div>
+            </section>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block stylesheets %}
+    {% if featured and results is null %}
+        <link rel="stylesheet" href="{{ asset('vendor/leaflet/leaflet.css') }}">
+    {% endif %}
+{% endblock %}
+
+{% block javascripts %}
+    {% if featured and results is null %}
+        <script src="{{ asset('vendor/leaflet/leaflet.js') }}" defer></script>
+        <script src="{{ asset('js/home-map.js') }}" defer></script>
     {% endif %}
 {% endblock %}

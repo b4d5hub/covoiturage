@@ -39,6 +39,26 @@ final class AppFixtures extends Fixture
         'Béni Mellal' => ['Gare routière de Béni Mellal', '32.335000', '-6.360000'],
     ];
 
+    /**
+     * Objet OpenStreetMap et centre de chaque localité, relevés auprès de Nominatim le 2026-11-12
+     * (géocodage inverse au niveau de la localité, depuis le point de rendez-vous ci-dessus).
+     * Une étape publiée dans ces villes retrouve ainsi la même ville.
+     */
+    private const LOCALITIES = [
+        'Agadir' => ['relation', '2529624', '30.420516', '-9.583853'],
+        'Taroudant' => ['relation', '2835912', '30.470651', '-8.877922'],
+        'Essaouira' => ['relation', '2821038', '31.511828', '-9.762090'],
+        'Marrakech' => ['relation', '2799538', '31.625826', '-7.989161'],
+        'Safi' => ['relation', '5935945', '32.299424', '-9.239533'],
+        'El Jadida' => ['relation', '5935946', '33.243331', '-8.498840'],
+        'Casablanca' => ['relation', '4072985', '33.594514', '-7.620028'],
+        'Rabat' => ['relation', '2799215', '34.021845', '-6.840893'],
+        'Meknès' => ['relation', '2561177', '33.898413', '-5.532158'],
+        'Fès' => ['relation', '2799557', '34.034653', '-5.016193'],
+        'Tanger' => ['relation', '2758781', '35.769491', '-5.804468'],
+        'Béni Mellal' => ['relation', '2882613', '32.334193', '-6.353335'],
+    ];
+
     /** @var array<string, City> */
     private array $cities = [];
 
@@ -160,7 +180,8 @@ final class AppFixtures extends Fixture
     private function createCities(ObjectManager $manager): void
     {
         foreach (array_keys(self::MEETING_POINTS) as $name) {
-            $this->cities[$name] = (new City())->setName($name);
+            [$osmType, $osmId, $latitude, $longitude] = self::LOCALITIES[$name];
+            $this->cities[$name] = (new City())->setName($name)->setOsm($osmType, $osmId)->setCentre($latitude, $longitude);
             $manager->persist($this->cities[$name]);
         }
     }

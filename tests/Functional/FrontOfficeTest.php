@@ -5,6 +5,7 @@ namespace App\Tests\Functional;
 use App\Entity\Trip;
 use App\Entity\User;
 use App\Enum\TripStatus;
+use App\Tests\Support\FakeOsmResponses;
 use App\Time\MoroccoTime;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -69,7 +70,7 @@ final class FrontOfficeTest extends WebTestCase
 
     private function search(string $from, string $to, string $date): void
     {
-        $this->client->request('GET', '/', ['from' => $this->cityId($from), 'to' => $this->cityId($to), 'date' => $date]);
+        $this->client->request('GET', '/', ['from' => $from, 'to' => $to, 'date' => $date]);
     }
 
     private function book(Trip $trip, int $boarding, int $alighting, int $seats): void
@@ -95,7 +96,7 @@ final class FrontOfficeTest extends WebTestCase
         $this->search('Agadir', 'Essaouira', $this->localDay(3));
 
         self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('body', '1 trajet trouvé');
+        self::assertSelectorTextContains('body', '1 trajet disponible');
         self::assertSelectorTextContains('body', 'Agadir → Essaouira');
         self::assertSelectorTextContains('body', 'Youssef A.');
     }
@@ -104,21 +105,63 @@ final class FrontOfficeTest extends WebTestCase
     {
         $this->search('Essaouira', 'Agadir', $this->localDay(3));
 
-        self::assertSelectorTextContains('body', '0 trajet trouvé');
+        self::assertSelectorTextContains('body', 'Aucun trajet');
     }
 
     public function testSearchUsesTheMoroccanDay(): void
     {
         $this->search('Agadir', 'Essaouira', $this->localDay(4));
 
-        self::assertSelectorTextContains('body', '0 trajet trouvé');
+        self::assertSelectorTextContains('body', 'Aucun trajet');
     }
 
     public function testSearchShowsWhenAPortionIsFull(): void
     {
         $this->search('Marrakech', 'Casablanca', $this->localDay(3));
 
-        self::assertSelectorTextContains('body', 'Complet sur cette portion');
+        self::assertSelectorTextContains('body', 'Complet entre ces étapes');
+    }
+
+    public function testAKnownCityIsFoundWithoutAccentsOrCaseAndWithoutExternalCall(): void
+    {
+        FakeOsmResponses::reset();
+        $this->search('  agadir ', 'ESSAOUIRA', $this->localDay(3));
+
+        self::assertSelectorTextContains('body', '1 trajet disponible');
+        self::assertSelectorTextContains('.section-head', 'Agadir → Essaouira');
+        self::assertSame([], FakeOsmResponses::$requests);
+    }
+
+    public function testAPlaceIsSearchedOnNominatimThenAroundIt(): void
+    {
+        FakeOsmResponses::reset();
+        self::getContainer()->get('cache.app')->clear();
+        // Lieu simulé situé au point de rendez-vous d'Agadir.
+        $this->search('Gare routière', 'Essaouira', $this->localDay(3));
+
+        self::assertSelectorTextContains('body', '1 trajet disponible');
+        self::assertSelectorTextContains('.section-head', 'Gare routière, Agadir → Essaouira');
+        self::assertSame(1, FakeOsmResponses::count('/search'));
+        self::assertSame(1, FakeOsmResponses::count('/reverse'));
+    }
+
+    public function testAnUnknownPlaceIsReportedBelowItsField(): void
+    {
+        FakeOsmResponses::reset();
+        $this->search('Agadir', 'Lieu imaginaire', $this->localDay(3));
+
+        self::assertSelectorTextContains('input[name="to"] + .form-error-below', 'Lieu introuvable au Maroc');
+    }
+
+    public function testWhenPlaceSearchIsDownACityNameStillWorks(): void
+    {
+        FakeOsmResponses::$mode = 'down';
+        $this->search('Agadir', 'Lieu en panne', $this->localDay(3));
+        self::assertSelectorTextContains('input[name="to"] + .form-error-below', 'indiquez le nom d\'une ville');
+
+        $this->search('Agadir', 'Essaouira', $this->localDay(3));
+        self::assertSelectorTextContains('body', '1 trajet disponible');
+        FakeOsmResponses::reset();
     }
 
     public function testSearchRefusesTheSameCityTwice(): void
@@ -126,7 +169,7 @@ final class FrontOfficeTest extends WebTestCase
         $this->search('Agadir', 'Agadir', $this->localDay(3));
 
         self::assertResponseStatusCodeSame(422);
-        self::assertSelectorTextContains('body', 'ville d\'arrivée différente');
+        self::assertSelectorTextContains('body', 'arrivée dans une autre ville que le départ');
     }
 
     public function testRegistrationCreatesALoggedInAccount(): void
@@ -205,7 +248,7 @@ final class FrontOfficeTest extends WebTestCase
 
         $this->book($trip, 0, 1, 2);
 
-        self::assertResponseRedirects('/mes-reservations');
+        self::assertMatchesRegularExpression('#^/mes-reservations/\d+$#', (string) $this->client->getResponse()->headers->get('Location'));
         $this->client->followRedirect();
         self::assertSelectorTextContains('body', 'Réservation confirmée');
         self::assertSame(36000, $this->sqlInt('SELECT total_price_cents FROM booking WHERE trip_id = ?', [$trip->getId()]));
@@ -234,7 +277,7 @@ final class FrontOfficeTest extends WebTestCase
         // Amine descend à Essaouira : la place est libre d'Agadir à Essaouira seulement pour un second passager.
         $this->book($trip, 0, 1, 1);
 
-        self::assertResponseRedirects('/mes-reservations');
+        self::assertMatchesRegularExpression('#^/mes-reservations/\d+$#', (string) $this->client->getResponse()->headers->get('Location'));
     }
 
     public function testDriverCannotBookOwnTrip(): void
@@ -404,7 +447,7 @@ final class FrontOfficeTest extends WebTestCase
         ]));
 
         self::assertResponseStatusCodeSame(422);
-        self::assertSelectorTextContains('body', 'dépasser le nombre de places du véhicule');
+        self::assertSelectorTextContains('body', 'Ce véhicule ne propose que 4 places passagers.');
         self::assertSame($before, $this->sqlInt('SELECT COUNT(*) FROM trip'));
     }
 

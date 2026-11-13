@@ -262,6 +262,18 @@ final class BackOfficeTest extends WebTestCase
         self::assertSame('Nouveau point public', $this->em->getConnection()->fetchOne("SELECT meeting_address FROM trip_stop WHERE trip_id = $id AND position = 0"));
     }
 
+    public function testItineraryTimesShowTheirTimezone(): void
+    {
+        $this->loginAsAdmin();
+        $id = $this->trip(fn (Trip $t) => !$t->isItineraryFrozen())->getId();
+        $crawler = $this->client->request('GET', "/admin/trip/$id/edit");
+
+        $labels = $crawler->filter('form[name="Trip"] label')->each(static fn ($label) => trim($label->text()));
+        self::assertContains('Arrivée (Africa/Casablanca)', $labels);
+        self::assertContains('Départ (Africa/Casablanca)', $labels);
+        self::assertStringNotContainsString('heure du Maroc', $this->client->getResponse()->getContent());
+    }
+
     public function testCapacityBelowOccupancyIsRefusedWithAMessage(): void
     {
         $this->loginAsAdmin();
@@ -301,6 +313,19 @@ final class BackOfficeTest extends WebTestCase
         $hash = $this->em->getConnection()->fetchOne("SELECT password FROM app_user WHERE email = 'nouveau@covoiturage.test'");
         self::assertNotSame('motdepasse-de-test', $hash);
         self::assertTrue(password_verify('motdepasse-de-test', $hash));
+    }
+
+    public function testCitiesComeFromOpenStreetMapAndCannotBeCreatedByHand(): void
+    {
+        $this->loginAsAdmin();
+        $this->client->request('GET', '/admin/city');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'relation 2529624');
+        self::assertSelectorNotExists('a[href*="/admin/city/new"]');
+
+        $this->client->request('GET', '/admin/city/new');
+        self::assertResponseStatusCodeSame(403);
     }
 
     public function testDeletingAReferencedCityIsRefusedCleanly(): void

@@ -8,7 +8,8 @@ framework:
                 base_uri: '%env(NOMINATIM_URL)%'
                 headers:
                     User-Agent: '%env(OSM_USER_AGENT)%'
-                timeout: 5
+                # Le serveur public répond parfois en plusieurs secondes.
+                timeout: 10
             osrm.client:
                 base_uri: '%env(OSRM_URL)%'
                 headers:
