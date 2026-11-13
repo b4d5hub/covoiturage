@@ -1,16 +1,38 @@
 {% extends 'base.html.twig' %}
+{% import '_ui.html.twig' as ui %}
 
 {% block title %}Notifications – Covoiturage régional{% endblock %}
 
 {% block body %}
-    <h1>Notifications</h1>
+    <div class="container container-narrow page">
+        <header class="page-head">
+            <div>
+                <h1>Notifications</h1>
+                <p class="muted">Réservations reçues sur vos trajets, annulations et remboursements. Elles sont marquées comme lues à l'ouverture de cette page.</p>
+            </div>
+        </header>
 
-    {% for item in items %}
-        <article class="card {{ item.isNew ? 'unread' : '' }}">
-            <p class="muted small">{{ item.notification.createdAt|date('d/m/Y à H:i') }}{% if item.isNew %} · <strong>Nouvelle</strong>{% endif %}</p>
-            <p>{{ item.notification.message }}</p>
-        </article>
-    {% else %}
-        <p class="card muted">Aucune notification.</p>
-    {% endfor %}
+        <section class="card">
+            {% if items is not empty %}
+                <ul class="notification-list">
+                    {% for item in items %}
+                        {% set notification = item.notification %}
+                        <li class="notification{{ item.isNew ? ' is-new' }}">
+                            <span class="notification-icon">{{ ui.icon(notification.booking and notification.booking.passenger is not same as(app.user) ? 'ticket' : 'bell') }}</span>
+                            <a class="notification-body notification-link" href="{{ path('app_notification_open', {id: notification.id}) }}">
+                                <p class="notification-time">
+                                    <time datetime="{{ item.notification.createdAt|date('c') }}">{{ item.notification.createdAt|fr_date('d MMMM y')|capitalize }} à {{ item.notification.createdAt|date('H:i') }}</time>
+                                    {% if item.isNew %}{{ ui.status('Nouvelle', 'ok') }}{% endif %}
+                                </p>
+                                <p>{{ item.notification.message }}</p>
+                                {% if notification.booking %}<span class="notification-go">{{ notification.booking.passenger is same as(app.user) ? 'Voir ma réservation' : 'Voir le trajet' }}{{ ui.icon('arrow') }}</span>{% endif %}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                {{ ui.empty('bell', 'Aucune notification', 'Un message apparaîtra ici quand un passager réserve une place sur votre trajet, ou si un conducteur annule un trajet que vous avez réservé.') }}
+            {% endif %}
+        </section>
+    </div>
 {% endblock %}

@@ -1,0 +1,59 @@
+{% extends 'base.html.twig' %}
+{% import '_ui.html.twig' as ui %}
+
+{% block title %}Mon compte – Covoiturage régional{% endblock %}
+
+{% block body %}
+    {% set user = app.user %}
+    <div class="container container-narrow page">
+        <section class="card account-head">
+            <span class="avatar avatar-lg" aria-hidden="true">{{ initials(user) }}</span>
+            <div class="account-id">
+                <h1>{{ user.firstName }} {{ user.lastName }}</h1>
+                <p class="muted">{{ ui.icon('mail') }} {{ user.email }}</p>
+                <p class="muted small">Membre depuis {{ user.createdAt|fr_date('MMMM y') }}{% if is_granted('ROLE_ADMIN') %} · Administrateur{% endif %}</p>
+            </div>
+            <a class="button button-secondary" href="{{ path('app_profile', {id: user.id}) }}">Voir mon profil public</a>
+        </section>
+        <p class="note account-privacy">{{ ui.icon('lock') }}<span>Votre nom complet et votre adresse e-mail ne sont visibles que par vous. Les autres membres voient « {{ user.displayName }} ».</span></p>
+
+        <div class="account-grid">
+            <a class="card card-link account-tile" href="{{ path('app_my_bookings') }}">
+                <span class="account-tile-icon">{{ ui.icon('ticket') }}</span>
+                <span class="account-tile-title">Mes réservations</span>
+                <span class="account-tile-meta">{{ upcomingBookings > 0 ? upcomingBookings ~ ' à venir' : 'Aucune à venir' }}</span>
+            </a>
+            <a class="card card-link account-tile" href="{{ path('app_driver') }}">
+                <span class="account-tile-icon">{{ ui.icon('route') }}</span>
+                <span class="account-tile-title">Espace conducteur</span>
+                <span class="account-tile-meta">{{ upcomingTrips > 0 ? upcomingTrips ~ ' trajet' ~ (upcomingTrips > 1 ? 's' : '') ~ ' à venir' : 'Aucun trajet à venir' }}</span>
+            </a>
+            <a class="card card-link account-tile" href="{{ path('app_driver_vehicles') }}">
+                <span class="account-tile-icon">{{ ui.icon('car') }}</span>
+                <span class="account-tile-title">Mes véhicules</span>
+                <span class="account-tile-meta">{{ user.vehicles is empty ? 'Aucun véhicule' : user.vehicles|length ~ ' enregistré' ~ (user.vehicles|length > 1 ? 's' : '') }}</span>
+            </a>
+            <a class="card card-link account-tile" href="{{ path('app_notifications') }}">
+                <span class="account-tile-icon">{{ ui.icon('bell') }}</span>
+                <span class="account-tile-title">Notifications</span>
+                <span class="account-tile-meta">{{ unread > 0 ? unread ~ ' non lue' ~ (unread > 1 ? 's' : '') : 'Tout est lu' }}</span>
+            </a>
+            <a class="card card-link account-tile" href="{{ path('app_profile', {id: user.id}) }}">
+                <span class="account-tile-icon">{{ ui.icon('star') }}</span>
+                <span class="account-tile-title">Avis reçus</span>
+                <span class="account-tile-meta">{% if rating.count > 0 %}{{ rating.average|number_format(1, ',') }}/5 · {{ rating.count }} avis{% else %}Aucun pour le moment{% endif %}</span>
+            </a>
+            {% if is_granted('ROLE_ADMIN') %}
+                <a class="card card-link account-tile" href="{{ path('admin') }}">
+                    <span class="account-tile-icon">{{ ui.icon('shield') }}</span>
+                    <span class="account-tile-title">Administration</span>
+                    <span class="account-tile-meta">Back-office</span>
+                </a>
+            {% endif %}
+        </div>
+
+        <div class="account-foot">
+            <a class="button button-ghost" href="{{ path('app_logout') }}">{{ ui.icon('logout') }}Se déconnecter</a>
+        </div>
+    </div>
+{% endblock %}

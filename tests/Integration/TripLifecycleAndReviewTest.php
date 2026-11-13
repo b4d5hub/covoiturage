@@ -62,7 +62,7 @@ final class TripLifecycleAndReviewTest extends ServiceTestCase
         $this->tripService->cancel($trip, $trip->getDriver(), 'Motif.', $this->at(self::BEFORE));
 
         // Départ à 07:00 UTC, soit 08:00 au Maroc en décembre.
-        self::assertSame(1, (int) $this->sql("SELECT COUNT(*) FROM notification WHERE message LIKE '%01/12/2026 à 08:00%'"));
+        self::assertSame(1, (int) $this->sql("SELECT COUNT(*) FROM notification WHERE message LIKE '%a été annulé%01/12/2026 à 08:00%' OR message LIKE '%01/12/2026 à 08:00%a été annulé%'"));
     }
 
     public function testPassengerWhoAlreadyCancelledIsNotNotifiedOrRefundedAgain(): void
@@ -73,7 +73,8 @@ final class TripLifecycleAndReviewTest extends ServiceTestCase
 
         $this->tripService->cancel($trip, $trip->getDriver(), 'Motif.', $this->at(self::BEFORE));
 
-        self::assertSame(0, (int) $this->sql('SELECT COUNT(*) FROM notification'));
+        // Seule la notification de réservation reçue par le conducteur existe : aucune pour le passager.
+        self::assertSame(0, (int) $this->sql('SELECT COUNT(*) FROM notification WHERE recipient_id = ?', [$passenger->getId()]));
         self::assertSame('2026-11-21 10:00:00', $this->sql('SELECT refunded_at FROM payment'));
     }
 

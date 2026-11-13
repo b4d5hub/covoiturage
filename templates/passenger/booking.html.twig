@@ -1,0 +1,101 @@
+{% extends 'base.html.twig' %}
+{% import '_ui.html.twig' as ui %}
+
+{% set booking = item.booking %}
+{% set trip = booking.trip %}
+{% set boarding = booking.boardingStop %}
+{% set alighting = booking.alightingStop %}
+{% set tones = {'Confirmée': 'ok', 'Effectuée': 'info', 'Annulée': 'danger', 'Annulée par le conducteur': 'danger', 'Départ passé': null} %}
+
+{% block title %}Réservation {{ boarding.city }} → {{ alighting.city }} – Covoiturage régional{% endblock %}
+
+{% block body %}
+    <div class="container page">
+        <a class="back-link" href="{{ path('app_my_bookings') }}">{{ ui.icon('arrowLeft') }}Mes réservations</a>
+
+        <header class="page-head">
+            <div>
+                <h1>{{ boarding.city }} → {{ alighting.city }}</h1>
+                <p class="ticket-ref">Réservation n° {{ booking.id }} · faite le {{ booking.createdAt|fr_date('d MMMM y') }}</p>
+                <p class="trip-head-meta">
+                    <span>{{ ui.icon('calendar') }}{{ boarding.departureAt|fr_date('EEEE d MMMM y')|capitalize }}</span>
+                    {{ ui.status(item.status, tones[item.status] ?? null) }}
+                </p>
+            </div>
+        </header>
+
+        {% if trip.cancellationReason %}
+            {{ ui.notice('error', 'Motif : ' ~ trip.cancellationReason ~ ' Votre paiement simulé a été intégralement remboursé.', 'Trajet annulé par le conducteur') }}
+        {% endif %}
+
+        <div class="layout-aside">
+            <div class="stack">
+                <section class="card ticket" aria-labelledby="ticket-title">
+                    <h2 class="visually-hidden" id="ticket-title">Votre trajet</h2>
+                    {% include 'components/route_timeline.html.twig' with {stops: [boarding, alighting], boarding: boarding, alighting: alighting, trip: trip, compact: true} only %}
+                    <p class="ticket-duration">{{ ui.icon('clock') }}{{ duration(boarding.departureAt, alighting.arrivalAt) }} de trajet · horaires prévus ({{ timezone }})</p>
+
+                    <div class="ticket-divider" aria-hidden="true"></div>
+
+                    <div class="person">
+                        <span class="avatar avatar-lg" aria-hidden="true">{{ initials(trip.driver) }}</span>
+                        <div>
+                            <p class="person-name">Conducteur : <a href="{{ path('app_profile', {id: trip.driver.id}) }}">{{ trip.driver.displayName }}</a></p>
+                            <p class="person-meta">{{ trip.vehicle }} · trajet {{ trip.routeLabel }}</p>
+                        </div>
+                    </div>
+                    <a class="button button-secondary ticket-trip-link" href="{{ path('app_trip_show', {id: trip.id}) }}">{{ ui.icon('map') }}Voir le trajet et la carte</a>
+                </section>
+            </div>
+
+            <aside aria-labelledby="payment-title">
+                <section class="card">
+                    <h2 class="card-title" id="payment-title">{{ ui.icon('card') }}Paiement</h2>
+                    <dl class="receipt{{ item.payment and item.payment.refundedAt ? ' is-refunded' }}">
+                        <dt>Prix par place</dt><dd>{{ booking.seatPriceCents|mad }}</dd>
+                        <dt>Places</dt><dd>{{ booking.seats }}</dd>
+                        <dt class="receipt-total">Total</dt><dd class="receipt-total">{{ booking.totalPriceCents|mad }}</dd>
+                    </dl>
+                    {% if item.payment %}
+                        <p class="receipt-state">
+                            {{ ui.icon(item.payment.refundedAt ? 'refund' : 'checkCircle') }}
+                            <span>
+                                Paiement simulé le {{ item.payment.paidAt|fr_date('d MMMM y') }} à {{ item.payment.paidAt|date('H:i') }}
+                                {% if item.payment.refundedAt %}<br>Remboursé intégralement le {{ item.payment.refundedAt|fr_date('d MMMM y') }} à {{ item.payment.refundedAt|date('H:i') }}{% endif %}
+                            </span>
+                        </p>
+                    {% endif %}
+
+                    {% if item.canCancel or item.canReview or item.review or (item.isUpcoming and not item.canCancel) or booking.cancelledAt %}
+                        <div class="card-footer ticket-actions">
+                            {% if item.canCancel %}
+                                <form method="post" action="{{ path('app_booking_cancel', {id: booking.id}) }}"
+                                      data-confirm="Annuler votre réservation {{ boarding.city }} → {{ alighting.city }} ({{ booking.seats }} place{{ booking.seats > 1 ? 's' }}) ? Vos places seront libérées et le paiement simulé de {{ booking.totalPriceCents|mad }} intégralement remboursé."
+                                      data-confirm-title="Annuler la réservation"
+                                      data-confirm-label="Annuler la réservation"
+                                      data-confirm-tone="danger">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('cancel-booking-' ~ booking.id) }}">
+                                    <input type="hidden" name="_back" value="show">
+                                    <button class="button button-danger-outline button-block" type="submit" data-busy-label="Annulation…">Annuler la réservation</button>
+                                </form>
+                                <p class="note">Gratuit jusqu'au {{ booking.cancellationDeadline|fr_date('d MMMM') }} à {{ booking.cancellationDeadline|date('H:i') }}, soit 2 heures avant votre départ.</p>
+                            {% elseif item.isUpcoming %}
+                                <p class="note">{{ ui.icon('lock') }}<span>Annulation impossible : elle était possible jusqu'au {{ booking.cancellationDeadline|fr_date('d MMMM') }} à {{ booking.cancellationDeadline|date('H:i') }}.</span></p>
+                            {% elseif booking.cancelledAt %}
+                                <p class="note">{{ ui.icon('ban') }}<span>Réservation annulée le {{ booking.cancelledAt|fr_date('d MMMM y') }} à {{ booking.cancelledAt|date('H:i') }}.</span></p>
+                            {% endif %}
+
+                            {% if item.canReview %}
+                                <a class="button button-block" href="{{ path('app_review_new', {id: trip.id, target: trip.driver.id}) }}">{{ ui.icon('star') }}Noter le conducteur</a>
+                            {% elseif item.review == 'done' %}
+                                <p class="note">{{ ui.icon('check') }}<span>Avis déposé</span></p>
+                            {% elseif item.review == 'expired' %}
+                                <p class="note">{{ ui.icon('clock') }}<span>Délai de 14 jours pour donner un avis dépassé</span></p>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </section>
+            </aside>
+        </div>
+    </div>
+{% endblock %}

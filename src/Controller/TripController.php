@@ -5,15 +5,15 @@ namespace App\Controller;
 use App\Entity\Trip;
 use App\Entity\TripStop;
 use App\Entity\User;
+use App\Enum\BookingStatus;
 use App\Enum\TripStatus;
 use App\Exception\DomainRuleException;
 use App\Form\BookingRequestType;
-use App\Geo\Coordinates;
-use App\Geo\OsrmRouter;
 use App\Repository\BookingRepository;
 use App\Repository\ReviewRepository;
 use App\Service\BookingService;
 use App\Service\PortionPricing;
+use App\Service\TripMapData;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
@@ -32,7 +32,7 @@ final class TripController extends AbstractController
         ReviewRepository $reviews,
         PortionPricing $pricing,
         EntityManagerInterface $entityManager,
-        OsrmRouter $router,
+        TripMapData $mapData,
     ): Response {
         $user = $this->getUser();
         $now = new \DateTimeImmutable();
@@ -43,7 +43,7 @@ final class TripController extends AbstractController
 
         foreach ($stops as $i => $boarding) {
             foreach (\array_slice($stops, $i + 1) as $alighting) {
-                $portions[] = [
+                $portions[$boarding->getId().'-'.$alighting->getId()] = [
                     'boarding' => $boarding,
                     'alighting' => $alighting,
                     'seatPrice' => $pricing->seatPriceCents($trip, $boarding, $alighting),
@@ -54,12 +54,18 @@ final class TripController extends AbstractController
         }
 
         $isOpen = TripStatus::Published === $trip->getStatus() && [] !== array_filter($portions, static fn (array $p) => $p['open']);
-        $canBook = $isOpen && $user instanceof User && $user !== $trip->getDriver();
+        // Une seule réservation active par passager et par trajet : la page montre celle qui existe déjà.
+        $myBooking = $user instanceof User
+            ? $bookings->findOneBy(['trip' => $trip, 'passenger' => $user, 'status' => BookingStatus::Confirmed])
+            : null;
+        $canBook = $isOpen && $user instanceof User && $user !== $trip->getDriver() && null === $myBooking;
 
         $stopRepository = $entityManager->getRepository(TripStop::class);
+        // Sans étapes demandées, le formulaire propose le trajet entier depuis la première étape encore à venir.
+        $firstOpen = array_values(array_filter(\array_slice($stops, 0, -1), static fn (TripStop $stop) => $stop->getDepartureAt() > $now))[0] ?? $stops[0];
         $form = $this->createForm(BookingRequestType::class, [
-            'boarding' => $stopRepository->findOneBy(['id' => $request->query->getInt('depart'), 'trip' => $trip]),
-            'alighting' => $stopRepository->findOneBy(['id' => $request->query->getInt('arrivee'), 'trip' => $trip]),
+            'boarding' => $stopRepository->findOneBy(['id' => $request->query->getInt('depart'), 'trip' => $trip]) ?? $firstOpen,
+            'alighting' => $stopRepository->findOneBy(['id' => $request->query->getInt('arrivee'), 'trip' => $trip]) ?? end($stops),
         ], ['trip' => $trip]);
         $form->handleRequest($request);
 
@@ -72,50 +78,45 @@ final class TripController extends AbstractController
                 try {
                     $booking = $bookingService->book($trip, $user, $data['boarding'], $data['alighting'], $data['seats']);
                     $this->addFlash('success', \sprintf(
-                        'Réservation confirmée : %d place(s) de %s à %s. Paiement simulé de %s, aucun montant réel n\'est débité.',
+                        'Réservation confirmée : %d place%s %s à %s. Paiement simulé de %d,%02d MAD, aucun montant réel n\'est débité.',
                         $booking->getSeats(),
-                        $booking->getBoardingStop()->getCity(),
+                        $booking->getSeats() > 1 ? 's' : '',
+                        self::fromCity((string) $booking->getBoardingStop()->getCity()),
                         $booking->getAlightingStop()->getCity(),
-                        number_format($booking->getTotalPriceCents() / 100, 2, ',', ' ').' MAD',
+                        intdiv($booking->getTotalPriceCents(), 100),
+                        $booking->getTotalPriceCents() % 100,
                     ));
 
-                    return $this->redirectToRoute('app_my_bookings');
+                    return $this->redirectToRoute('app_booking_show', ['id' => $booking->getId()]);
                 } catch (DomainRuleException $exception) {
                     $form->addError(new FormError($exception->getMessage()));
                 }
             }
         }
 
+        $selection = $form->getData();
+        $selected = $portions[(($selection['boarding'] ?? null)?->getId() ?? '').'-'.(($selection['alighting'] ?? null)?->getId() ?? '')] ?? null;
+
         return $this->render('trip/show.html.twig', [
             'trip' => $trip,
             'stops' => $stops,
             'portions' => $portions,
+            'selected' => $selected,
             'form' => $form,
             'isOpen' => $isOpen,
             'canBook' => $canBook,
+            'myBooking' => $myBooking,
+            'passengers' => $user instanceof User && $user === $trip->getDriver() ? $bookings->findConfirmedForTrip($trip) : [],
+            // Prix et places de chaque portion, pour le total affiché avant la réservation.
+            'portionsData' => array_map(static fn (array $p) => ['seatPriceCents' => $p['seatPrice'], 'available' => $p['open'] ? $p['available'] : 0, 'open' => $p['open']], $portions),
             'driverRating' => $reviews->ratingOf($trip->getDriver()),
-            'map' => $this->mapData($stops, $router),
+            'map' => $mapData->of($trip),
         ], new Response(null, $form->isSubmitted() && !$form->isValid() ? 422 : 200));
     }
 
-    /**
-     * Données de la carte : étapes et tracé OSRM, ou lignes droites entre les étapes si le service ne répond pas.
-     *
-     * @param list<TripStop> $stops
-     */
-    private function mapData(array $stops, OsrmRouter $router): array
+    /** « de Marrakech », mais « d'Agadir » devant une voyelle. */
+    private static function fromCity(string $city): string
     {
-        $points = array_map(static fn (TripStop $stop) => new Coordinates($stop->getLatitude(), $stop->getLongitude()), $stops);
-        $route = $router->route($points);
-
-        return [
-            'stops' => array_map(static fn (TripStop $stop) => [
-                'latitude' => (float) $stop->getLatitude(),
-                'longitude' => (float) $stop->getLongitude(),
-                'label' => $stop->getCity().' – '.$stop->getMeetingAddress(),
-            ], $stops),
-            'path' => $route?->path ?: array_map(static fn (TripStop $stop) => [(float) $stop->getLatitude(), (float) $stop->getLongitude()], $stops),
-            'approximate' => null === $route,
-        ];
+        return 1 === preg_match('/^[AEIOUYÉÈÊaeiouyéèê]/u', $city) ? 'd\''.$city : 'de '.$city;
     }
 }

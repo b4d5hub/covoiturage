@@ -7,7 +7,9 @@ use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Notification affichée dans l'espace passager.
+ * Notification affichée dans l'application : au passager quand son trajet est annulé,
+ * au conducteur quand une place est réservée. Elle se rapporte à une réservation, qui détermine
+ * la page ouverte depuis la notification.
  */
 #[ORM\Entity(repositoryClass: NotificationRepository::class)]
 class Notification
@@ -31,6 +33,11 @@ class Notification
 
     #[ORM\Column]
     private bool $isRead = false;
+
+    /** Réservation concernée ; aucune pour une notification sans page associée. */
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(nullable: true)]
+    private ?Booking $booking = null;
 
     public function __construct()
     {
@@ -69,6 +76,26 @@ class Notification
     public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
+    }
+
+    /** Date de l'événement notifié (réservation, annulation), et non de l'écriture en base. */
+    public function setCreatedAt(\DateTimeImmutable $createdAt): static
+    {
+        $this->createdAt = $createdAt;
+
+        return $this;
+    }
+
+    public function getBooking(): ?Booking
+    {
+        return $this->booking;
+    }
+
+    public function setBooking(?Booking $booking): static
+    {
+        $this->booking = $booking;
+
+        return $this;
     }
 
     public function isRead(): bool

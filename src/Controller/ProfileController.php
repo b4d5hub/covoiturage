@@ -5,6 +5,8 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Enum\BookingStatus;
 use App\Enum\TripStatus;
+use App\Repository\BookingRepository;
+use App\Repository\NotificationRepository;
 use App\Repository\ReviewRepository;
 use App\Repository\TripRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -35,6 +37,33 @@ final class ProfileController extends AbstractController
             'reviews' => $reviews->findReceivedBy($user),
             'tripsAsDriver' => $trips->countForDriver($user, TripStatus::Completed),
             'tripsAsPassenger' => $tripsAsPassenger,
+        ]);
+    }
+
+    /** Compte de l'utilisateur connecté : identité, adresse de connexion et raccourcis. Visible de lui seul. */
+    #[Route('/mon-compte', name: 'app_account')]
+    #[IsGranted('ROLE_USER')]
+    public function account(ReviewRepository $reviews, TripRepository $trips, BookingRepository $bookings, NotificationRepository $notifications): Response
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+        $now = new \DateTimeImmutable();
+        $upcomingBookings = array_filter(
+            $bookings->findForPassenger($user),
+            static fn ($booking) => $booking->isConfirmed()
+                && TripStatus::Published === $booking->getTrip()->getStatus()
+                && $booking->getBoardingStop()->getDepartureAt() > $now,
+        );
+        $upcomingTrips = array_filter(
+            $trips->findForDriver($user),
+            static fn ($trip) => TripStatus::Published === $trip->getStatus() && $trip->getDepartureAt() > $now,
+        );
+
+        return $this->render('profile/account.html.twig', [
+            'rating' => $reviews->ratingOf($user),
+            'upcomingBookings' => \count($upcomingBookings),
+            'upcomingTrips' => \count($upcomingTrips),
+            'unread' => $notifications->countUnread($user),
         ]);
     }
 

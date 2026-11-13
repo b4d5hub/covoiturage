@@ -42,6 +42,8 @@ final class TripLifecycleService
                 $this->payments->refund($booking, $now);
                 $this->entityManager->persist((new Notification())
                     ->setRecipient($booking->getPassenger())
+                    ->setBooking($booking)
+                    ->setCreatedAt($now)
                     ->setMessage(\sprintf(
                         'Le trajet %s du %s a été annulé par le conducteur. Motif : %s Votre paiement simulé a été intégralement remboursé.',
                         $trip,

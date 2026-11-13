@@ -1,0 +1,7 @@
+{% if booking %}
+    <div class="escale-handoff">
+        <p class="escale-kicker">Votre trajet</p>
+        {% include 'components/route_timeline.html.twig' with {stops: [booking.boarding, booking.alighting], boarding: booking.boarding, alighting: booking.alighting, trip: booking.trip, compact: true} only %}
+        <p class="small">Après cette étape, vous retrouverez le prix et les places disponibles avant de confirmer.</p>
+    </div>
+{% endif %}

@@ -1,96 +1,216 @@
 {% extends 'base.html.twig' %}
+{% import '_ui.html.twig' as ui %}
+{% block body_class %}escale-trip{% endblock %}
+
+    {% macro portion_rows(list, trip, canBook) %}
+    {% import '_ui.html.twig' as ui %}
+        {% for portion in list %}
+            <tr{% if not portion.open or portion.available < 1 %} class="is-muted"{% endif %}>
+                <th scope="row">{{ portion.boarding.city }} → {{ portion.alighting.city }}<span class="portion-points">{{ portion.boarding.meetingAddress }} → {{ portion.alighting.meetingAddress }}</span></th>
+                <td class="cell-right">{{ portion.seatPrice|mad }}</td>
+                <td class="cell-right">{{ portion.open ? (portion.available > 0 ? portion.available : 'Complet') : 'Départ passé' }}</td>
+                {% if canBook %}
+                    <td class="cell-right">
+                        {% if portion.open and portion.available > 0 %}
+                            <a class="portion-pick" href="{{ path('app_trip_show', {id: trip.id, depart: portion.boarding.id, arrivee: portion.alighting.id}) }}#reserver" data-pick-portion data-boarding="{{ portion.boarding.id }}" data-alighting="{{ portion.alighting.id }}"><span aria-hidden="true">Choisir</span><span class="visually-hidden">Choisir {{ portion.boarding.city }} → {{ portion.alighting.city }}</span></a>
+                        {% endif %}
+                    </td>
+                {% endif %}
+            </tr>
+        {% endfor %}
+    {% endmacro %}
 
 {% block title %}{{ trip.routeLabel }} – Covoiturage régional{% endblock %}
 
 {% block body %}
-    <header class="page-header">
-        <div>
-            <h1>{{ trip.routeLabel }}</h1>
-            <p class="muted">Départ le {{ trip.departureAt|date('d/m/Y à H:i') }} · <span class="tag">{{ trip.statusLabel }}</span></p>
-        </div>
-        <div class="card driver-card">
-            <p>Conducteur : <a href="{{ path('app_profile', {id: trip.driver.id}) }}">{{ trip.driver.displayName }}</a></p>
-            <p class="muted">
-                {% if driverRating.count > 0 %}{{ driverRating.average|number_format(1, ',') }}/5 ({{ driverRating.count }} avis){% else %}Pas encore d'avis{% endif %}
-            </p>
-            <p class="muted">{{ trip.vehicle }} · {{ trip.seatCapacity }} places proposées</p>
-        </div>
-    </header>
+    {% set lastStop = stops|last %}
+    {% set statusTone = {published: 'ok', completed: 'info', cancelled: 'danger'} %}
+    {% set ownTrip = app.user and app.user is same as(trip.driver) %}
+    {% set boarding = myBooking ? myBooking.boardingStop : (selected and not ownTrip ? selected.boarding : null) %}
+    {% set alighting = myBooking ? myBooking.alightingStop : (selected and not ownTrip ? selected.alighting : null) %}
+    {% set isPortion = boarding and not canBook and (boarding != stops|first or alighting != lastStop) %}
+    {% set bookable = portions|filter(p => p.open and p.available > 0) %}
+    {% set canPick = canBook or (isOpen and not app.user) %}
+    {% set selectionReady = selected and selected.open and selected.available > 0 %}
+    {% set initialSeats = form.seats.vars.data|default(1) %}
+    {% set totalReady = selectionReady and initialSeats > 0 and initialSeats <= selected.available %}
+    <div class="container page">
+        <header class="trip-head">
+            <div>
+                <h1>{{ isPortion ? boarding.city ~ ' → ' ~ alighting.city : trip.routeLabel }}</h1>
+                {% if isPortion %}<p class="escale-continuation">{{ ui.icon('route') }}<span>Sur le trajet <strong>{{ trip.routeLabel }}</strong></span></p>{% endif %}
+                <p class="trip-head-meta">
+                    <span>{{ ui.icon('calendar') }}{{ (isPortion ? boarding.departureAt : trip.departureAt)|fr_date('EEEE d MMMM y')|capitalize }}</span>
+                    <span>{{ ui.icon('clock') }}{{ (isPortion ? boarding.departureAt : trip.departureAt)|date('H:i') }} – {{ (isPortion ? alighting.arrivalAt : lastStop.arrivalAt)|date('H:i') }}</span>
+                    <span>{{ ui.icon('pin') }}{{ stops|length }} étapes{{ isPortion ? ' au total' }}</span>
+                    {% if trip.status.value != 'published' %}{{ ui.status('Trajet ' ~ trip.statusLabel|lower, statusTone[trip.status.value]) }}{% endif %}
+                </p>
+            </div>
+        </header>
 
-    {% if trip.cancellationReason %}
-        <div class="flash flash-error">Trajet annulé par le conducteur. Motif : {{ trip.cancellationReason }}</div>
-    {% endif %}
-
-    <section class="card">
-        <h2>Itinéraire</h2>
-        <table>
-            <thead><tr><th>Étape</th><th>Point de rendez-vous</th><th>Arrivée</th><th>Départ</th></tr></thead>
-            <tbody>
-                {% for stop in stops %}
-                    <tr>
-                        <td><strong>{{ stop.city }}</strong></td>
-                        <td>{{ stop.meetingAddress }}</td>
-                        <td>{{ stop.arrivalAt ? stop.arrivalAt|date('d/m H:i') : '—' }}</td>
-                        <td>{{ stop.departureAt ? stop.departureAt|date('d/m H:i') : '—' }}</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </section>
-
-    <section class="card">
-        <h2>Carte</h2>
-        <div id="trip-map" class="trip-map" data-tiles="{{ map_tile_url }}" data-map="{{ map|json_encode|e('html_attr') }}"></div>
-        <p class="muted small">
-            {% if map.approximate %}Tracé approximatif en lignes droites : le calcul d'itinéraire est momentanément indisponible.{% else %}Tracé routier calculé par OSRM.{% endif %}
-            Fond de carte © <a href="https://www.openstreetmap.org/copyright">contributeurs OpenStreetMap</a> ·
-            <a href="https://www.openstreetmap.org/fixthemap">Signaler une erreur de carte</a>
-        </p>
-    </section>
-
-    <section class="card">
-        <h2>Portions et prix</h2>
-        <p class="muted">Le prix d'une portion est proportionnel à sa distance routière. Prix du trajet complet : {{ trip.fullPriceCents|mad }}.</p>
-        <table>
-            <thead><tr><th>Portion</th><th>Prix par place</th><th>Places libres</th></tr></thead>
-            <tbody>
-                {% for portion in portions %}
-                    <tr>
-                        <td>{{ portion.boarding.city }} → {{ portion.alighting.city }}</td>
-                        <td>{{ portion.seatPrice|mad }}</td>
-                        <td>{{ portion.open ? portion.available : 'Départ passé' }}</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </section>
-
-    <section class="card">
-        <h2>Réserver</h2>
-        {% if not isOpen %}
-            <p class="muted">Ce trajet n'est plus ouvert à la réservation.</p>
-        {% elseif not app.user %}
-            <p><a href="{{ path('app_login') }}">Connectez-vous</a> ou <a href="{{ path('app_register') }}">créez un compte</a> pour réserver.</p>
-        {% elseif not canBook %}
-            <p class="muted">Vous êtes le conducteur de ce trajet.</p>
-        {% else %}
-            {{ form_start(form, {attr: {class: 'inline-form'}}) }}
-                {{ form_errors(form) }}
-                {{ form_row(form.boarding) }}
-                {{ form_row(form.alighting) }}
-                {{ form_row(form.seats) }}
-                <button class="button" type="submit">Réserver et payer</button>
-            {{ form_end(form) }}
-            <p class="muted">Paiement simulé : la réservation est confirmée immédiatement, aucun montant réel n'est débité.</p>
+        {% if trip.cancellationReason %}
+            {{ ui.notice('error', 'Motif : ' ~ trip.cancellationReason, 'Trajet annulé par le conducteur') }}
         {% endif %}
-    </section>
+
+        <div class="layout-aside">
+            <aside id="reserver" aria-labelledby="booking-title">
+                <section class="card booking-panel">
+                    <h2 id="booking-title">{{ myBooking ? 'Votre réservation' : (app.user and app.user is same as(trip.driver) ? 'Vos passagers' : 'Réserver') }}</h2>
+                    {% if myBooking %}
+                        <div class="my-booking">
+                            <p class="my-booking-route">{{ myBooking.boardingStop.city }} → {{ myBooking.alightingStop.city }}</p>
+                            <p class="muted small">Départ {{ myBooking.boardingStop.departureAt|fr_date('EEEE d MMMM')|lower }} à {{ myBooking.boardingStop.departureAt|date('H:i') }}, {{ myBooking.boardingStop.meetingAddress }}</p>
+                            <dl class="my-booking-facts">
+                                <div><dt>Places</dt><dd>{{ myBooking.seats }}</dd></div>
+                                <div><dt>Total payé</dt><dd>{{ myBooking.totalPriceCents|mad }}</dd></div>
+                            </dl>
+                            <a class="button button-block" href="{{ path('app_booking_show', {id: myBooking.id}) }}">Voir ma réservation</a>
+                            <p class="note">{{ ui.icon('info') }}<span>Une seule réservation par trajet. Pour changer d'étapes ou de nombre de places, annulez celle-ci puis réservez de nouveau.</span></p>
+                        </div>
+                    {% elseif app.user and app.user is same as(trip.driver) %}
+                        {% if passengers is not empty %}
+                            <ul class="passengers">
+                                {% for booking in passengers %}
+                                    <li class="passenger">
+                                        <span class="avatar avatar-sm" aria-hidden="true">{{ initials(booking.passenger) }}</span>
+                                        <div class="passenger-info">
+                                            <a href="{{ path('app_profile', {id: booking.passenger.id}) }}">{{ booking.passenger.displayName }}</a>
+                                            <span>{{ booking.boardingStop.city }} → {{ booking.alightingStop.city }} · {{ booking.seats }} place{{ booking.seats > 1 ? 's' }}</span>
+                                        </div>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p class="muted">Aucun passager pour le moment.</p>
+                        {% endif %}
+                        <a class="button button-secondary button-block my-trip-link" href="{{ path('app_driver') }}#trajet-{{ trip.id }}">Gérer ce trajet</a>
+                        <a class="button button-secondary button-block" href="{{ path('app_driver_publish', {retour: trip.id}) }}">Publier le trajet retour</a>
+                        <p class="note">{{ ui.icon('car') }}<span>Vous êtes le conducteur de ce trajet.</span></p>
+                    {% elseif not isOpen %}
+                        {{ ui.empty('lock', 'Réservation fermée', trip.status.value == 'published' ? 'Toutes les étapes de ce trajet sont déjà parties.' : 'Ce trajet n\'est plus ouvert à la réservation.', path('app_home'), 'Chercher un autre trajet', true) }}
+                    {% elseif not app.user %}
+                        {% if selected %}
+                            <div class="escale-fare{{ selectionReady ? '' : ' is-unavailable' }}">
+                                <p class="price">{{ selected.seatPrice|mad }}<span class="price-unit">par place</span></p>
+                                {{ selected.open ? ui.availability(selected.available) : ui.status('Départ passé', 'warn') }}
+                            </div>
+                            {% include 'components/route_timeline.html.twig' with {stops: [boarding, alighting], boarding: boarding, alighting: alighting, trip: trip, compact: true} only %}
+                        {% endif %}
+                        {% if selectionReady %}
+                            {% set handoff = {trajet: trip.id, depart: boarding.id, arrivee: alighting.id} %}
+                            <p class="note escale-payment">{{ ui.icon('card') }}<span><strong>Paiement simulé</strong> · aucun débit réel</span></p>
+                            {{ ui.button('Se connecter pour réserver', {href: path('app_login', handoff), block: true}) }}
+                            <p class="small escale-register-link">Connectez-vous pour confirmer ce trajet ou <a href="{{ path('app_register', handoff) }}">créez un compte</a>.</p>
+                        {% else %}
+                            <p>{{ selected and selected.open ? 'Aucune place entre ces deux étapes.' : 'Cette étape de montée est déjà passée.' }}</p>
+                            {% if bookable is not empty %}
+                                {{ ui.button('Voir les autres étapes', {href: '#itineraire', variant: 'secondary', block: true}) }}
+                            {% else %}
+                                {{ ui.button('Chercher un autre trajet', {href: path('app_home'), variant: 'secondary', block: true}) }}
+                            {% endif %}
+                        {% endif %}
+                    {% else %}
+                        {{ form_start(form, {attr: {'data-booking-form': '', 'data-portions': portionsData|json_encode, novalidate: 'novalidate'}}) }}
+                            {% if form.vars.errors|length > 0 %}
+                                <div class="flash flash-error form-errors" role="alert">{{ ui.icon('alert') }}<div><p class="flash-title">Réservation impossible</p>{{ form_errors(form) }}</div></div>
+                            {% endif %}
+                            <div class="booking-pair">
+                                {{ form_row(form.boarding) }}
+                                {{ form_row(form.alighting) }}
+                            </div>
+                            <div class="field{{ form.seats.vars.errors|length > 0 ? ' field--invalid' }}">
+                                {{ form_label(form.seats) }}
+                                <div class="seat-stepper" data-seat-stepper>
+                                    <button type="button" data-step="-1" aria-label="Une place de moins" hidden>−</button>
+                                    {{ form_widget(form.seats, {attr: {inputmode: 'numeric'}}) }}
+                                    <button type="button" data-step="1" aria-label="Une place de plus" hidden>+</button>
+                                </div>
+                                {{ form_errors(form.seats) }}
+                            </div>
+
+                            <div class="booking-summary" data-booking-total aria-live="polite"{% if not totalReady %} hidden{% endif %}>
+                                <dl>
+                                    <dt>Votre trajet</dt><dd data-summary="portion">{{ totalReady ? boarding.city ~ ' → ' ~ alighting.city }}</dd>
+                                    <dt>Prix par place</dt><dd data-summary="price">{{ totalReady ? selected.seatPrice|mad }}</dd>
+                                    <dt>Nombre de places</dt><dd data-summary="seats">{{ totalReady ? initialSeats }}</dd>
+                                    <dt class="total-row">Total <small class="escale-simulated">Paiement simulé</small></dt><dd class="total-row" data-summary="total">{{ totalReady ? (selected.seatPrice * initialSeats)|mad }}</dd>
+                                </dl>
+                            </div>
+                            <p class="booking-message" data-booking-message aria-live="polite"{% if not selected %} hidden{% endif %}>{{ selected ? (selected.open ? (selected.available > 0 ? ui.seats(selected.available)|trim ~ (selected.available == 1 ? ' libre entre ces étapes.' : ' libres entre ces étapes.') : 'Complet entre ces étapes.') : 'Cette étape de montée est déjà passée.') }}</p>
+
+                            {{ ui.button('Confirmer la réservation', {booking: true, block: true, busy: 'Réservation en cours…'}) }}
+                        {{ form_end(form) }}
+                        <div class="booking-notes">
+                            <p class="note">{{ ui.icon('card') }}<span>Aucun débit réel. La réservation est confirmée immédiatement.</span></p>
+                            <p class="note">{{ ui.icon('refund') }}<span>Annulation possible jusqu'à 2 heures avant votre départ, avec remboursement intégral.</span></p>
+                        </div>
+                    {% endif %}
+                </section>
+            </aside>
+            <div class="stack">
+                <section class="card" id="itineraire" aria-labelledby="itinerary-title">
+                    <h2 class="card-title" id="itinerary-title">{{ ui.icon('pin') }}Itinéraire et prix</h2>
+                    {% include 'components/route_timeline.html.twig' with {stops: stops, boarding: boarding, alighting: alighting, trip: trip, compact: false, offers: {portions: portions, canPick: canPick and not myBooking, lastStop: lastStop}} only %}
+                    <p class="note note-spaced" id="itinerary-hint">{{ ui.icon('info') }}<span>Horaires prévus ({{ timezone }}). Le prix affiché à chaque étape part de votre étape de montée ; il dépend de la distance parcourue. Trajet entier : {{ trip.fullPriceCents|mad }} par place.</span></p>
+                    <details class="more-portions" id="portions">
+                        <summary>{{ ui.icon('chevronDown') }}Voir tous les prix entre les étapes</summary>
+                        {% set closed = portions|filter(p => not (p.open and p.available > 0)) %}
+                        {% set head %}<thead><tr><th scope="col">Trajet</th><th scope="col" class="cell-right">Prix par place</th><th scope="col" class="cell-right">Places libres</th>{% if canPick %}<th scope="col"><span class="visually-hidden">Action</span></th>{% endif %}</tr></thead>{% endset %}
+                        <div class="table-wrap">
+                            <table>
+                                <caption class="visually-hidden">Prix par place et places libres entre chaque paire d'étapes</caption>
+                                {{ head }}
+                                <tbody>{{ _self.portion_rows(bookable, trip, canPick) }}{{ _self.portion_rows(closed, trip, canPick) }}</tbody>
+                            </table>
+                        </div>
+                    </details>
+                </section>
+
+                <section class="card" aria-labelledby="map-title">
+                    <h2 class="card-title" id="map-title">{{ ui.icon('map') }}Carte</h2>
+                    <div id="trip-map" class="trip-map" role="img" aria-label="Carte du trajet {{ trip.routeLabel }}" data-tiles="{{ map_tile_url }}" data-map="{{ map|json_encode|e('html_attr') }}"></div>
+                    <p class="map-credit">
+                        {% if map.approximate %}Tracé approximatif en lignes droites : le calcul d'itinéraire est momentanément indisponible.{% else %}Tracé routier calculé par OSRM.{% endif %}
+                        Fond de carte © <a href="https://www.openstreetmap.org/copyright">contributeurs OpenStreetMap</a> ·
+                        <a href="https://www.openstreetmap.org/fixthemap">Signaler une erreur de carte</a>
+                    </p>
+                </section>
+
+                <section class="card" aria-labelledby="driver-title">
+                    <h2 class="card-title" id="driver-title">{{ ui.icon('user') }}Conducteur et véhicule</h2>
+                    <div class="person">
+                        <span class="avatar avatar-lg" aria-hidden="true">{{ initials(trip.driver) }}</span>
+                        <div>
+                            <p class="person-name">Conducteur : <a href="{{ path('app_profile', {id: trip.driver.id}) }}">{{ trip.driver.displayName }}</a></p>
+                            <p class="person-meta">{{ ui.rating(driverRating) }}</p>
+                        </div>
+                    </div>
+                    <dl class="facts">
+                        <div><dt>Véhicule</dt><dd>{{ trip.vehicle }}</dd></div>
+                        <div><dt>Places proposées</dt><dd>{{ trip.seatCapacity }}</dd></div>
+                        <div><dt>Trajet entier</dt><dd>{{ trip.fullPriceCents|mad }}</dd></div>
+                    </dl>
+                </section>
+            </div>
+
+
+        </div>
+    </div>
+
+    {% if canBook %}
+        <div class="mobile-book-bar" data-mobile-book-bar hidden>
+            <p class="price"><span data-bar-total>{{ totalReady ? (selected.seatPrice * initialSeats)|mad : '—' }}</span><span class="price-unit" data-bar-detail>{{ totalReady ? 'Paiement simulé' : 'Choisissez vos étapes' }}</span></p>
+            {{ ui.button('Réservation', {href: '#reserver'}) }}
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block stylesheets %}
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <link rel="stylesheet" href="{{ asset('vendor/leaflet/leaflet.css') }}">
 {% endblock %}
 
 {% block javascripts %}
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+    <script src="{{ asset('vendor/leaflet/leaflet.js') }}" defer></script>
     <script src="{{ asset('js/trip-map.js') }}" defer></script>
+    <script src="{{ asset('js/booking-total.js') }}" defer></script>
 {% endblock %}

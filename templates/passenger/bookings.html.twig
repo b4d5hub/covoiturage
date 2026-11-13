@@ -1,43 +1,98 @@
 {% extends 'base.html.twig' %}
+{% import '_ui.html.twig' as ui %}
 
 {% block title %}Mes réservations – Covoiturage régional{% endblock %}
 
-{% block body %}
-    <h1>Mes réservations</h1>
+{% macro booking_card(item, past) %}
+    {% import '_ui.html.twig' as ui %}
+    {% set booking = item.booking %}
+    {% set trip = booking.trip %}
+    {% set boarding = booking.boardingStop %}
+    {% set alighting = booking.alightingStop %}
+    {% set tones = {'Confirmée': 'ok', 'Effectuée': 'info', 'Annulée': 'danger', 'Annulée par le conducteur': 'danger', 'Départ passé': null} %}
+    <article class="card booking{{ past ? ' is-past' }}" aria-labelledby="booking-{{ booking.id }}">
+        <div class="datebox" aria-hidden="true">
+            <span class="datebox-day">{{ boarding.departureAt|date('d') }}</span>
+            <span class="datebox-month">{{ boarding.departureAt|fr_date('MMM')|trim('.') }}</span>
+        </div>
 
-    {% for item in items %}
-        {% set booking = item.booking %}
-        {% set trip = booking.trip %}
-        <article class="card trip-card">
-            <div class="trip-main">
-                <p class="route">
-                    <a href="{{ path('app_trip_show', {id: trip.id}) }}">{{ booking.boardingStop.city }} → {{ booking.alightingStop.city }}</a>
-                    <span class="tag {{ booking.confirmed ? '' : 'tag-muted' }}">{{ booking.statusLabel }}</span>
-                    {% if trip.statusLabel != 'Publié' %}<span class="tag tag-muted">Trajet {{ trip.statusLabel|lower }}</span>{% endif %}
-                </p>
-                <p class="muted">
-                    Départ le {{ booking.boardingStop.departureAt|date('d/m/Y à H:i') }} de {{ booking.boardingStop.meetingAddress }}
-                    · Conducteur : <a href="{{ path('app_profile', {id: trip.driver.id}) }}">{{ trip.driver.displayName }}</a>
-                </p>
-                <p class="muted">
-                    {{ booking.seats }} place{{ booking.seats > 1 ? 's' }} · {{ booking.totalPriceCents|mad }}
-                    {% if item.payment %}· Paiement simulé : {{ item.payment.statusLabel|lower }}{% endif %}
-                </p>
-            </div>
-            <div class="trip-side">
-                {% if item.canCancel %}
-                    <form method="post" action="{{ path('app_booking_cancel', {id: booking.id}) }}" onsubmit="return confirm('Annuler cette réservation ?');">
-                        <input type="hidden" name="_token" value="{{ csrf_token('cancel-booking-' ~ booking.id) }}">
-                        <button class="button button-secondary" type="submit">Annuler</button>
-                    </form>
-                    <p class="muted small">Possible jusqu'au {{ booking.cancellationDeadline|date('d/m/Y à H:i') }}</p>
-                {% endif %}
-                {% if item.canReview %}
-                    <a class="button" href="{{ path('app_review_new', {id: trip.id, target: trip.driver.id}) }}">Noter le conducteur</a>
+        <div class="booking-main">
+            <h3 class="booking-title" id="booking-{{ booking.id }}">
+                <a href="{{ path('app_booking_show', {id: booking.id}) }}">{{ boarding.city }} → {{ alighting.city }}</a>
+                {{ ui.status(item.status, tones[item.status] ?? null) }}
+            </h3>
+            <div class="booking-lines">
+                <span>{{ ui.icon('clock') }}<span>{{ boarding.departureAt|fr_date('EEEE d MMMM')|capitalize }}, départ <time datetime="{{ boarding.departureAt|date('c') }}">{{ boarding.departureAt|date('H:i') }}</time>, arrivée prévue <time datetime="{{ alighting.arrivalAt|date('c') }}">{{ alighting.arrivalAt|date('H:i') }}</time></span></span>
+                <span>{{ ui.icon('pin') }}<span>Rendez-vous : {{ boarding.meetingAddress }}</span></span>
+                <span>{{ ui.icon('user') }}<span>Conducteur : <a href="{{ path('app_profile', {id: trip.driver.id}) }}">{{ trip.driver.displayName }}</a> · {{ trip.vehicle }}</span></span>
+                {% if trip.cancellationReason %}
+                    <span>{{ ui.icon('info') }}<span>Motif d'annulation : {{ trip.cancellationReason }}</span></span>
                 {% endif %}
             </div>
-        </article>
-    {% else %}
-        <p class="card muted">Vous n'avez encore aucune réservation. <a href="{{ path('app_home') }}">Rechercher un trajet</a></p>
-    {% endfor %}
+        </div>
+
+        <div class="booking-side">
+            <div>
+                <p class="price">{{ booking.totalPriceCents|mad }}</p>
+                <p class="small muted">
+                    {{ booking.seats }} place{{ booking.seats > 1 ? 's' }} × {{ booking.seatPriceCents|mad }}
+                    {% if item.payment %}
+                        <br>{{ ui.icon(item.payment.refundedAt ? 'refund' : 'card') }} {{ item.payment.refundedAt ? 'Remboursé le ' ~ item.payment.refundedAt|fr_date('d MMM') : 'Payé le ' ~ item.payment.paidAt|fr_date('d MMM') }} (simulé)
+                    {% endif %}
+                </p>
+            </div>
+
+            {% if item.canCancel %}
+                <form method="post" action="{{ path('app_booking_cancel', {id: booking.id}) }}"
+                      data-confirm="Annuler votre réservation {{ boarding.city }} → {{ alighting.city }} ({{ booking.seats }} place{{ booking.seats > 1 ? 's' }}) ? Vos places seront libérées et le paiement simulé de {{ booking.totalPriceCents|mad }} intégralement remboursé."
+                      data-confirm-title="Annuler la réservation"
+                      data-confirm-label="Annuler la réservation"
+                      data-confirm-tone="danger">
+                    <input type="hidden" name="_token" value="{{ csrf_token('cancel-booking-' ~ booking.id) }}">
+                    <button class="button button-danger-outline button-small" type="submit" data-busy-label="Annulation…">Annuler la réservation</button>
+                </form>
+                <p class="note">Gratuit jusqu'au {{ booking.cancellationDeadline|fr_date('d MMMM') }} à {{ booking.cancellationDeadline|date('H:i') }}</p>
+            {% elseif not past and booking.confirmed %}
+                <p class="note">{{ ui.icon('lock') }}<span>Annulation impossible : elle était possible jusqu'à 2 heures avant le départ, soit le {{ booking.cancellationDeadline|fr_date('d MMMM') }} à {{ booking.cancellationDeadline|date('H:i') }}.</span></p>
+            {% endif %}
+
+            {% if item.canReview %}
+                <a class="button button-small" href="{{ path('app_review_new', {id: trip.id, target: trip.driver.id}) }}">{{ ui.icon('star') }}Noter le conducteur</a>
+            {% elseif item.review == 'done' %}
+                <p class="note">{{ ui.icon('check') }}<span>Avis déposé</span></p>
+            {% elseif item.review == 'expired' %}
+                <p class="note">{{ ui.icon('clock') }}<span>Délai de 14 jours pour donner un avis dépassé</span></p>
+            {% endif %}
+        </div>
+    </article>
+{% endmacro %}
+
+{% block body %}
+    <div class="container page">
+        <header class="page-head">
+            <div>
+                <h1>Mes réservations</h1>
+                <p class="muted">Vos places réservées comme passager.</p>
+            </div>
+            <a class="button button-secondary" href="{{ path('app_home') }}">{{ ui.icon('search') }}Rechercher un trajet</a>
+        </header>
+
+        <section id="a-venir" aria-labelledby="upcoming-title">
+            <h2 id="upcoming-title">À venir <span class="count">{{ upcoming|length }}</span></h2>
+            {% for item in upcoming %}
+                {{ _self.booking_card(item, false) }}
+            {% else %}
+                <div class="card">{{ ui.empty('ticket', 'Aucune réservation à venir', 'Trouvez un conducteur qui passe par vos villes.', path('app_home'), 'Rechercher un trajet') }}</div>
+            {% endfor %}
+        </section>
+
+        {% if history is not empty %}
+            <section class="section" id="historique" aria-labelledby="history-title">
+                <h2 id="history-title">Historique <span class="count">{{ history|length }}</span></h2>
+                {% for item in history %}
+                    {{ _self.booking_card(item, true) }}
+                {% endfor %}
+            </section>
+        {% endif %}
+    </div>
 {% endblock %}

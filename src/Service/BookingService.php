@@ -3,12 +3,14 @@
 namespace App\Service;
 
 use App\Entity\Booking;
+use App\Entity\Notification;
 use App\Entity\Trip;
 use App\Entity\TripStop;
 use App\Entity\User;
 use App\Enum\TripStatus;
 use App\Exception\DomainRuleException;
 use App\Repository\BookingRepository;
+use App\Time\MoroccoTime;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -50,6 +52,21 @@ final class BookingService
             $this->entityManager->persist($booking);
             $this->payments->pay($booking, $now);
             $trip->freezeItinerary($now);
+            // Le conducteur est prévenu dans l'application de chaque réservation reçue.
+            $this->entityManager->persist((new Notification())
+                ->setRecipient($trip->getDriver())
+                ->setBooking($booking)
+                ->setCreatedAt($now)
+                ->setMessage(\sprintf(
+                    'Nouvelle réservation : %s a réservé %d place%s de %s à %s sur votre trajet %s du %s.',
+                    $passenger->getDisplayName(),
+                    $seats,
+                    $seats > 1 ? 's' : '',
+                    $boarding->getCity(),
+                    $alighting->getCity(),
+                    $trip,
+                    MoroccoTime::toLocal($trip->getDepartureAt())->format('d/m/Y à H:i'),
+                )));
             $this->entityManager->flush();
 
             return $booking;
@@ -70,6 +87,22 @@ final class BookingService
 
             $booking->cancelByPassenger($now);
             $this->payments->refund($booking, $now);
+            // Le conducteur est prévenu : les places sont de nouveau proposées aux autres passagers.
+            $trip = $booking->getTrip();
+            $this->entityManager->persist((new Notification())
+                ->setRecipient($trip->getDriver())
+                ->setBooking($booking)
+                ->setCreatedAt($now)
+                ->setMessage(\sprintf(
+                    'Annulation : %s a annulé sa réservation de %d place%s de %s à %s sur votre trajet %s du %s. Ces places sont de nouveau disponibles.',
+                    $booking->getPassenger()->getDisplayName(),
+                    $booking->getSeats(),
+                    $booking->getSeats() > 1 ? 's' : '',
+                    $booking->getBoardingStop()->getCity(),
+                    $booking->getAlightingStop()->getCity(),
+                    $trip,
+                    MoroccoTime::toLocal($trip->getDepartureAt())->format('d/m/Y à H:i'),
+                )));
             $this->entityManager->flush();
         });
     }
@@ -99,12 +132,18 @@ final class BookingService
 
     private function assertSeatsAvailable(Trip $trip, TripStop $boarding, TripStop $alighting, int $seats): void
     {
-        foreach ($this->bookings->occupiedSeatsBySegment($trip) as $position => $occupied) {
-            $isRequested = $position >= $boarding->getPosition() && $position < $alighting->getPosition();
+        $free = $trip->getSeatCapacity();
 
-            if ($isRequested && $trip->getSeatCapacity() - $occupied < $seats) {
-                throw new DomainRuleException('Il n\'y a pas assez de places disponibles sur cette portion.');
+        foreach ($this->bookings->occupiedSeatsBySegment($trip) as $position => $occupied) {
+            if ($position >= $boarding->getPosition() && $position < $alighting->getPosition()) {
+                $free = min($free, $trip->getSeatCapacity() - $occupied);
             }
+        }
+
+        if ($free < $seats) {
+            throw new DomainRuleException(0 >= $free
+                ? 'Il n\'y a pas assez de places disponibles sur cette portion : elle est complète.'
+                : \sprintf('Il n\'y a pas assez de places disponibles sur cette portion : il en reste %d.', $free));
         }
     }
 }

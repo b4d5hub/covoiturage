@@ -1,0 +1,24 @@
+{# Aperçu chargé sous la cloche : fragment sans mise en page. #}
+{% import '_ui.html.twig' as ui %}
+<div class="notif-head">
+    <p class="notif-title">Notifications</p>
+    {% if unread > 0 %}<span class="notif-count">{{ unread }} non lue{{ unread > 1 ? 's' }}</span>{% endif %}
+</div>
+{% if items is not empty %}
+    <ul class="notif-list">
+        {% for notification in items %}
+            <li>
+                <a class="notif-item{{ notification.read ? '' : ' is-new' }}" href="{{ path('app_notification_open', {id: notification.id}) }}">
+                    <span class="notif-icon" aria-hidden="true">{{ ui.icon(notification.booking and notification.booking.passenger is not same as(app.user) ? 'ticket' : 'bell') }}</span>
+                    <span class="notif-text">
+                        <span class="notif-message">{{ notification.message }}</span>
+                        <time class="notif-time" datetime="{{ notification.createdAt|date('c') }}">{{ notification.createdAt|fr_date('d MMM') }} à {{ notification.createdAt|date('H:i') }}{% if not notification.read %} · <strong>Nouvelle</strong>{% endif %}</time>
+                    </span>
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p class="notif-empty">Aucune notification pour le moment.</p>
+{% endif %}
+<a class="notif-all" href="{{ path('app_notifications') }}">Voir toutes les notifications</a>

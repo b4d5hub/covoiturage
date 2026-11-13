@@ -20,27 +20,29 @@ final class BookingRequestType extends AbstractType
         $trip = $options['trip'];
         $stops = $trip->getStops()->toArray();
         usort($stops, static fn (TripStop $a, TripStop $b) => $a->getPosition() <=> $b->getPosition());
-        $label = static function (TripStop $stop, bool $departure): string {
-            $time = $departure ? $stop->getDepartureAt() : $stop->getArrivalAt();
+        // « Rabat, 09:30 » ; la date n'est ajoutée que si l'étape est un autre jour que le départ.
+        $firstDay = MoroccoTime::toLocal($stops[0]->getDepartureAt())->format('Y-m-d');
+        $label = static function (TripStop $stop, bool $departure) use ($firstDay): string {
+            $time = MoroccoTime::toLocal($departure ? $stop->getDepartureAt() : $stop->getArrivalAt());
 
-            return $stop->getCity().' – '.MoroccoTime::toLocal($time)->format('d/m H:i');
+            return $stop->getCity().', '.($time->format('Y-m-d') === $firstDay ? $time->format('H:i') : $time->format('d/m à H:i'));
         };
 
         $builder
             ->add('boarding', ChoiceType::class, [
-                'label' => 'Montée',
+                'label' => 'Je monte à',
                 'choices' => \array_slice($stops, 0, -1),
                 'choice_value' => static fn (?TripStop $stop) => $stop?->getId(),
                 'choice_label' => static fn (TripStop $stop) => $label($stop, true),
             ])
             ->add('alighting', ChoiceType::class, [
-                'label' => 'Descente',
+                'label' => 'Je descends à',
                 'choices' => \array_slice($stops, 1),
                 'choice_value' => static fn (?TripStop $stop) => $stop?->getId(),
                 'choice_label' => static fn (TripStop $stop) => $label($stop, false),
             ])
             ->add('seats', IntegerType::class, [
-                'label' => 'Places',
+                'label' => 'Nombre de places',
                 'data' => 1,
                 'attr' => ['min' => 1, 'max' => $trip->getSeatCapacity()],
                 'constraints' => [new Assert\Range(min: 1, max: $trip->getSeatCapacity())],

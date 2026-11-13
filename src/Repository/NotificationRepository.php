@@ -28,6 +28,12 @@ class NotificationRepository extends ServiceEntityRepository
         return $this->findBy(['recipient' => $user], ['createdAt' => 'DESC', 'id' => 'DESC']);
     }
 
+    /** @return list<Notification> les plus récentes, pour l'aperçu de la cloche */
+    public function findLatestFor(User $user, int $limit): array
+    {
+        return $this->findBy(['recipient' => $user], ['createdAt' => 'DESC', 'id' => 'DESC'], $limit);
+    }
+
     public function markAllRead(User $user): void
     {
         $this->createQueryBuilder('n')
