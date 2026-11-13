@@ -340,3 +340,11 @@ Comparaison avec les parcours de publication décrits par les centres d'aide de 
 | Aperçu sous la cloche | Un clic sur la cloche ouvre les 5 dernières notifications, lues ou non, sans les marquer comme lues, avec « Voir toutes les notifications ». Sur téléphone, l'aperçu s'ouvre dans le menu, sous la cloche. Sans JavaScript, la cloche mène à la page des notifications. L'aperçu est demandé dès que le pointeur ou le clavier atteint la cloche. | Consultation rapide sans quitter la page, même sans nouveauté ; l'aperçu s'affiche sans attente perceptible. |
 | Fuseau horaire affiché | Les libellés des heures (formulaires de trajet, back-office compris, fiche du trajet, réservation, pied de page) indiquent le nom du fuseau, `Africa/Casablanca`, au lieu de « heure du Maroc ». | Nom exact et sans ambiguïté, valable toute l'année : un décalage fixe (UTC+1) serait faux pendant le ramadan, quand le Maroc passe à UTC+0. |
 | Version des fichiers publics | Les adresses des styles, scripts et images portent la date de modification du fichier (`?v=…`). | Après une mise à jour, le navigateur charge la nouvelle version au lieu d'une copie gardée en cache. |
+
+---
+
+## 2026-11-13 — Test sur machine vierge
+
+| Sujet | Résultat |
+|---|---|
+| Vérification (complète « Vérification » du niveau 5) | Installation réussie sur une machine virtuelle Ubuntu vierge (VirtualBox), en suivant INSTALL.md pas à pas depuis le dépôt public : `docker compose up -d --wait`, puis recherche, réservation, publication, back-office et conservation des données après un redémarrage. |

@@ -23,7 +23,7 @@ Puis ouvrir <http://localhost:8000>. Prérequis, comptes de démonstration et d�
 | 2 | Faire respecter les règles | Fait : réservation par segments sans surréservation, annulations, avis, tests automatisés |
 | 3 | En faire un produit | Fait : comptes, recherche et réservation, espaces passager et conducteur, profils |
 | 4 | S'ouvrir au monde | Fait : recherche de lieux et géocodage inverse Nominatim, distances OSRM, prix suggéré, carte OpenStreetMap, recherche dans un rayon de 5 km |
-| 5 | Livrer | Fait : installation Docker en une commande et [INSTALL.md](INSTALL.md). Test sur machine vierge : en attente de l'essai sur une machine virtuelle Ubuntu vierge |
+| 5 | Livrer | Fait : installation Docker en une commande et [INSTALL.md](INSTALL.md). Test sur machine vierge : réussi le 13 novembre 2026 sur une machine virtuelle Ubuntu vierge (VirtualBox), en suivant INSTALL.md : installation en une commande, recherche, réservation, publication, back-office et conservation des données au redémarrage |
 
 ## Ce qui fonctionne
 
