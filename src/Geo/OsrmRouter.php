@@ -54,10 +54,11 @@ final class OsrmRouter
             return null;
         }
 
-        return [] === $result ? null : new Route($result['legs'], $result['path']);
+        // Les itinéraires mis en cache avant l'ajout des durées n'en ont pas.
+        return [] === $result ? null : new Route($result['legs'], $result['path'], $result['durations'] ?? []);
     }
 
-    /** @return array{legs?: list<int>, path?: list<array{float, float}>} vide si aucun itinéraire */
+    /** @return array{legs?: list<int>, durations?: list<int>, path?: list<array{float, float}>} vide si aucun itinéraire */
     private function request(string $path): array
     {
         $this->limiter->create('osrm')->reserve(1)->wait();
@@ -75,6 +76,7 @@ final class OsrmRouter
 
         return [
             'legs' => array_map(static fn (array $leg): int => (int) round($leg['distance']), $route['legs']),
+            'durations' => array_map(static fn (array $leg): int => (int) round($leg['duration'] ?? 0), $route['legs']),
             'path' => array_map(static fn (array $point): array => [round((float) $point[1], 5), round((float) $point[0], 5)], $route['geometry']['coordinates'] ?? []),
         ];
     }

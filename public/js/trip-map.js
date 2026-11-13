@@ -5,17 +5,24 @@ if (element && window.L) {
     const data = JSON.parse(element.dataset.map);
     const map = L.map(element, { scrollWheelZoom: false });
 
+    map.attributionControl?.setPrefix(false);
     L.tileLayer(element.dataset.tiles, {
         maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">contributeurs OpenStreetMap</a>',
     }).addTo(map);
 
-    const line = L.polyline(data.path, { color: '#0b6e4f', weight: 4, dashArray: data.approximate ? '6 8' : null }).addTo(map);
+    const theme = getComputedStyle(element);
+    const line = L.polyline(data.path, { color: theme.getPropertyValue('--escale-action').trim(), weight: 4, dashArray: data.approximate ? '6 8' : null }).addTo(map);
 
     data.stops.forEach((stop) => {
-        L.circleMarker([stop.latitude, stop.longitude], { radius: 7, color: '#08533b', fillColor: '#ffffff', fillOpacity: 1, weight: 3 })
+        const label = document.createElement('span');
+        label.textContent = stop.label;
+        L.marker([stop.latitude, stop.longitude], {
+            icon: L.divIcon({ className: 'escale-map-stop', iconSize: [14, 14] }),
+            title: stop.label,
+        })
             .addTo(map)
-            .bindTooltip(stop.label);
+            .bindTooltip(label);
     });
 
     if (!data.approximate) {

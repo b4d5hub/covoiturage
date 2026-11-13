@@ -1,56 +1,332 @@
 {% extends 'base.html.twig' %}
+{% import '_ui.html.twig' as ui %}
 
 {% block title %}Publier un trajet – Covoiturage régional{% endblock %}
 
-{% macro stop_fields(line) %}
+{% macro stop_fields(line, number) %}
+    {% import '_ui.html.twig' as ui %}
     <fieldset class="stop" data-collection-item>
-        <legend>Étape</legend>
-        <div class="stop-grid">
-            {{ form_row(line.city) }}
-            {{ form_row(line.meetingAddress) }}
-            {{ form_row(line.latitude) }}
-            {{ form_row(line.longitude) }}
-            <div><button type="button" class="button button-secondary button-small" data-geocode>Trouver les coordonnées</button><span class="geo-status" data-geo-status></span></div>
-            {{ form_row(line.arrivalAt) }}
-            {{ form_row(line.departureAt) }}
-            {{ form_row(line.distanceToNextMeters) }}
+        <legend><span class="stop-index" data-stop-index aria-hidden="true">{{ number }}</span><span data-stop-title>Étape {{ number }}</span></legend>
+        <div class="stop-tools">
+            <button type="button" class="button button-ghost button-small button-icon" data-move="-1" aria-label="Avancer cette étape dans l'itinéraire" title="Avancer">{{ ui.icon('chevronUp') }}</button>
+            <button type="button" class="button button-ghost button-small button-icon" data-move="1" aria-label="Reculer cette étape dans l'itinéraire" title="Reculer">{{ ui.icon('chevronDown') }}</button>
+            <button type="button" class="button button-ghost button-small button-icon" data-collection-remove aria-label="Retirer cette étape" title="Retirer">{{ ui.icon('trash') }}</button>
         </div>
-        <button type="button" class="button button-secondary button-small" data-collection-remove>Retirer cette étape</button>
+
+        <div class="stop-body">
+            {# Recherche d'un lieu : affichée par le script ; résultats seulement sur « Rechercher », jamais pendant la frappe. #}
+            <div class="place-finder" data-place-finder hidden>
+                <label class="label" for="place-query-{{ number }}" data-place-label>Où retrouvez-vous vos passagers ?</label>
+                <div class="place-search">
+                    <input type="search" id="place-query-{{ number }}" class="input" data-place-query placeholder="Gare, adresse, quartier ou ville" maxlength="200" autocomplete="off" enterkeyhint="search">
+                    <button type="button" class="button" data-place-search>{{ ui.icon('search') }}Rechercher</button>
+                </div>
+                <p class="help-text">Ou cliquez directement sur la carte. Choisissez un lieu public, jamais une adresse personnelle.</p>
+                <ul class="place-results" data-place-results hidden></ul>
+                <p class="geo-status" data-geo-status role="status"></p>
+                <p class="stop-place" data-stop-place hidden>{{ ui.icon('pin') }}<span data-stop-place-text></span></p>
+            </div>
+
+            <div class="stop-grid">
+                {{ form_row(line.meetingAddress, {attr: {placeholder: 'Gare routière, place publique…'}}) }}
+            </div>
+
+            <div class="stop-grid">
+                <div data-stop-field="arrival">{{ form_row(line.arrivalAt) }}</div>
+                <div data-stop-field="departure">{{ form_row(line.departureAt) }}</div>
+            </div>
+
+            {% set technicalErrors = line.city.vars.errors|length + line.latitude.vars.errors|length + line.longitude.vars.errors|length + line.distanceToNextMeters.vars.errors|length %}
+            <details class="stop-advanced" data-stop-advanced{{ technicalErrors > 0 ? ' open' }}>
+                <summary>{{ ui.icon('chevronDown') }}<span>Saisie manuelle, si la carte ne répond pas</span><span class="stop-advanced-state" data-advanced-state>à compléter</span></summary>
+                <div class="stop-advanced-body">
+                    <p class="help-text">Remplies d'après le lieu choisi sur la carte. Si la carte est indisponible, saisissez-les vous-même et choisissez la ville.</p>
+                    <div class="stop-coordinates">
+                        {{ form_row(line.latitude) }}
+                        {{ form_row(line.longitude) }}
+                    </div>
+                    {{ form_row(line.city) }}
+                    <div data-stop-field="distance">{{ form_row(line.distanceToNextMeters, {attr: {min: 1, inputmode: 'numeric'}}) }}<p class="km-hint" data-km-hint aria-live="polite"></p></div>
+                </div>
+            </details>
+        </div>
     </fieldset>
 {% endmacro %}
 
 {% block body %}
-    <h1>Publier un trajet</h1>
-
-    {{ form_start(form) }}
-        {{ form_errors(form) }}
-        <section class="card">
-            {{ form_row(form.vehicle) }}
-            {{ form_row(form.seatCapacity) }}
-            {{ form_row(form.fullPriceCents) }}
-        </section>
-
-        <section class="card" data-collection data-geo-assist data-geocode-url="{{ path('app_geo_geocode') }}" data-route-url="{{ path('app_geo_route') }}" data-prototype="{{ _self.stop_fields(form.itinerary.vars.prototype)|e('html_attr') }}">
-            <h2>Itinéraire</h2>
-            <p class="muted">Étapes dans l'ordre du trajet, heures du Maroc. La première étape n'a qu'un départ, la dernière qu'une arrivée. Indiquez pour chaque étape la distance routière jusqu'à la suivante.</p>
-            {{ form_errors(form.itinerary) }}
-            <div data-collection-list>
-                {% for line in form.itinerary %}{{ _self.stop_fields(line) }}{% endfor %}
+    <div class="container container-narrow page">
+        <header class="page-head">
+            <div>
+                <h1>Publier un trajet</h1>
+                <p class="muted">D'où, où, quand, puis vos arrêts, votre véhicule et votre prix. Les passagers pourront réserver tout ou partie du parcours.</p>
             </div>
-            <button type="button" class="button button-secondary" data-collection-add>Ajouter une étape</button>
-            <div class="route-assist">
-                <button type="button" class="button" data-route>Calculer les distances et le prix suggéré</button>
-                <span data-route-status class="muted"></span>
-            </div>
-            <p class="muted small">Aide facultative : géocodage par Nominatim et distances routières par OSRM, données © contributeurs OpenStreetMap (licence ODbL). Saisissez une adresse publique, jamais une adresse personnelle. Le prix suggéré se base sur {{ (price_per_km_cents / 100)|number_format(2, ',') }} MAD par kilomètre.</p>
-        </section>
+        </header>
 
-        {% do form.itinerary.setRendered %}
-        <button class="button" type="submit">Publier le trajet</button>
-    {{ form_end(form) }}
+        <ol class="wizard-progress" data-wizard-progress hidden>
+            <li data-progress="route"><span>1</span>Trajet</li>
+            <li data-progress="stops"><span>2</span>Arrêts</li>
+            <li data-progress="vehicle"><span>3</span>Véhicule</li>
+            <li data-progress="price"><span>4</span>Prix</li>
+            <li data-progress="recap"><span>5</span>Publier</li>
+        </ol>
+
+        {{ form_start(form, {attr: {'data-publish-form': ''}}) }}
+            {# Assistant pas à pas, affiché par le script. Il remplit les champs du formulaire complet ci-dessous,
+               qui reste seul envoyé au serveur : sans JavaScript, ou si la carte ne répond pas, c'est lui qu'on utilise. #}
+            <div class="wizard" data-wizard hidden>
+                <section class="card wizard-panel" data-panel="route" aria-labelledby="panel-route" hidden>
+                    <h2 id="panel-route">{{ returnOf ? 'Votre trajet retour' : 'Votre trajet' }}</h2>
+                    {% if returnOf %}<p class="muted">Étapes de l'aller {{ returnOf.routeLabel }}, dans l'ordre inverse. Choisissez la date et l'heure du départ.</p>{% endif %}
+                    <div class="wizard-endpoints">
+                        <div class="picker" data-picker="first">
+                            <label class="label" for="pick-first">D'où partez-vous ?</label>
+                            <div class="picker-chosen" data-picker-chosen hidden>
+                                <span class="picker-dot" aria-hidden="true"></span>
+                                <span class="picker-text"><strong data-picker-name></strong><span data-picker-city></span></span>
+                                <button type="button" class="link-button" data-picker-change>Modifier</button>
+                            </div>
+                            <div class="picker-search" data-picker-search>
+                                <div class="place-search">
+                                    <input type="search" id="pick-first" class="input" data-picker-query placeholder="Ville, gare, quartier ou adresse" maxlength="200" autocomplete="off" enterkeyhint="search" role="combobox" aria-autocomplete="list" aria-expanded="false">
+                                    <button type="button" class="button" data-picker-go>{{ ui.icon('search') }}Rechercher</button>
+                                </div>
+                                <ul class="place-results" data-picker-results hidden></ul>
+                                <p class="geo-status" data-picker-status role="status" hidden></p>
+                            </div>
+                        </div>
+                        <div class="picker" data-picker="last">
+                            <label class="label" for="pick-last">Où allez-vous ?</label>
+                            <div class="picker-chosen" data-picker-chosen hidden>
+                                <span class="picker-dot" aria-hidden="true"></span>
+                                <span class="picker-text"><strong data-picker-name></strong><span data-picker-city></span></span>
+                                <button type="button" class="link-button" data-picker-change>Modifier</button>
+                            </div>
+                            <div class="picker-search" data-picker-search>
+                                <div class="place-search">
+                                    <input type="search" id="pick-last" class="input" data-picker-query placeholder="Ville, gare, quartier ou adresse" maxlength="200" autocomplete="off" enterkeyhint="search" role="combobox" aria-autocomplete="list" aria-expanded="false">
+                                    <button type="button" class="button" data-picker-go>{{ ui.icon('search') }}Rechercher</button>
+                                </div>
+                                <ul class="place-results" data-picker-results hidden></ul>
+                                <p class="geo-status" data-picker-status role="status" hidden></p>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="help-text">Choisissez un lieu public (gare, station, place), jamais une adresse personnelle. Vous pouvez aussi cliquer sur la carte.</p>
+
+                    <div class="wizard-when">
+                        <div class="field">
+                            <label class="label" for="wizard-date">Date du départ</label>
+                            <input type="date" id="wizard-date" class="input" data-wizard-date>
+                        </div>
+                        <div class="field">
+                            <label class="label" for="wizard-time">Heure de départ</label>
+                            <input type="time" id="wizard-time" class="input" data-wizard-time step="300">
+                        </div>
+                    </div>
+                    <p class="help-text">Fuseau horaire : {{ timezone }}. Les heures de passage aux autres étapes sont calculées d'après la route ; vous pourrez les ajuster.</p>
+
+                    <div data-map-slot="route"></div>
+                    <p class="wizard-error" data-panel-error role="alert" hidden></p>
+                    <div class="wizard-nav">
+                        <span></span>
+                        <button type="button" class="button" data-panel-next>Continuer{{ ui.icon('arrow') }}</button>
+                    </div>
+                </section>
+
+                <section class="card wizard-panel" data-panel="stops" aria-labelledby="panel-stops" hidden>
+                    <h2 id="panel-stops">Des arrêts en chemin ?</h2>
+                    <p class="muted">Chaque arrêt permet à d'autres passagers de monter ou de descendre : vous remplissez plus facilement votre voiture.</p>
+
+                    <div class="suggested-stops" data-suggested hidden>
+                        <p class="label">Villes sur votre route</p>
+                        <div class="suggested-list" data-suggested-list></div>
+                    </div>
+
+                    <div class="picker picker-extra" data-picker="extra" hidden>
+                        <label class="label" for="pick-extra">Autre arrêt</label>
+                        <div class="picker-search" data-picker-search>
+                            <div class="place-search">
+                                <input type="search" id="pick-extra" class="input" data-picker-query placeholder="Ville, gare, quartier ou adresse" maxlength="200" autocomplete="off" enterkeyhint="search" role="combobox" aria-autocomplete="list" aria-expanded="false">
+                                <button type="button" class="button" data-picker-go>{{ ui.icon('search') }}Rechercher</button>
+                            </div>
+                            <ul class="place-results" data-picker-results hidden></ul>
+                            <p class="geo-status" data-picker-status role="status" hidden></p>
+                        </div>
+                        <button type="button" class="link-button" data-extra-cancel>Annuler</button>
+                    </div>
+                    <button type="button" class="button button-secondary" data-extra-open>{{ ui.icon('plus') }}Ajouter un autre arrêt</button>
+
+                    <h3 class="wizard-subtitle">Votre itinéraire</h3>
+                    <ol class="plan" data-plan></ol>
+                    <p class="leg-status" data-leg-status role="status" hidden></p>
+
+                    <div data-map-slot="stops"></div>
+                    <p class="wizard-error" data-panel-error role="alert" hidden></p>
+                    <div class="wizard-nav">
+                        <button type="button" class="button button-ghost" data-panel-back>Retour</button>
+                        <button type="button" class="button" data-panel-next>Continuer{{ ui.icon('arrow') }}</button>
+                    </div>
+                </section>
+
+                <section class="card wizard-panel" data-panel="vehicle" aria-labelledby="panel-vehicle" hidden>
+                    <h2 id="panel-vehicle">Votre véhicule</h2>
+                    <div class="form-grid" data-slot="vehicle"></div>
+                    <p class="note">{{ ui.icon('car') }}<span>Un autre véhicule ? <a href="{{ path('app_driver_vehicles') }}">Gérer mes véhicules</a></span></p>
+                    <p class="wizard-error" data-panel-error role="alert" hidden></p>
+                    <div class="wizard-nav">
+                        <button type="button" class="button button-ghost" data-panel-back>Retour</button>
+                        <button type="button" class="button" data-panel-next>Continuer{{ ui.icon('arrow') }}</button>
+                    </div>
+                </section>
+
+                <section class="card wizard-panel" data-panel="price" aria-labelledby="panel-price" hidden>
+                    <h2 id="panel-price">Prix par place</h2>
+                    <p class="muted">Pour le trajet entier. Un passager qui ne fait qu'une partie du trajet paie selon la distance parcourue.</p>
+                    <div class="price-stepper">
+                        <button type="button" class="stepper-button" data-price-step="-500" aria-label="5 MAD de moins">−</button>
+                        <div class="price-stepper-value" data-slot="price"></div>
+                        <button type="button" class="stepper-button" data-price-step="500" aria-label="5 MAD de plus">+</button>
+                    </div>
+                    <p class="price-hint" data-price-hint hidden></p>
+                    <div class="price-preview" data-price-preview hidden>
+                        <p class="label">Ce que paieront les passagers</p>
+                        <dl data-price-preview-list></dl>
+                    </div>
+                    <p class="wizard-error" data-panel-error role="alert" hidden></p>
+                    <div class="wizard-nav">
+                        <button type="button" class="button button-ghost" data-panel-back>Retour</button>
+                        <button type="button" class="button" data-panel-next>Continuer{{ ui.icon('arrow') }}</button>
+                    </div>
+                </section>
+
+                <section class="card wizard-panel" data-panel="recap" aria-labelledby="panel-recap" hidden>
+                    <h2 id="panel-recap">Vérifier et publier</h2>
+                    <p class="muted">Voici votre trajet tel que les passagers le verront.</p>
+                    <div class="recap-ticket">
+                        <p class="recap-date" data-recap-date></p>
+                        <ol class="plan plan-readonly" data-recap-plan></ol>
+                        <dl class="recap-facts">
+                            <div><dt>Places</dt><dd data-recap-seats></dd></div>
+                            <div><dt>Prix du trajet entier</dt><dd data-recap-price></dd></div>
+                            <div><dt>Distance</dt><dd data-recap-distance></dd></div>
+                        </dl>
+                    </div>
+                    <p class="callout">{{ ui.icon('lock') }}<span><strong>À savoir :</strong> dès la première réservation, les étapes, les horaires et les points de rendez-vous ne pourront plus être modifiés. Vous pourrez toujours annuler le trajet avant son départ.</span></p>
+                    <p class="wizard-error" data-panel-error role="alert" hidden></p>
+                    <div class="wizard-nav">
+                        <button type="button" class="button button-ghost" data-panel-back>Retour</button>
+                        <button class="button button-large" type="submit" data-busy-label="Publication…">Publier le trajet</button>
+                    </div>
+                </section>
+
+                <div class="publish-map-wrap" data-wizard-map hidden>
+                    <div class="publish-map" data-publish-map role="application" aria-label="Carte du trajet : cliquez pour placer un lieu"></div>
+                    <p class="map-credit">Tracé routier par OSRM · <a href="https://www.openstreetmap.org/fixthemap">Signaler une erreur de carte</a></p>
+                </div>
+                <p class="osm-credit">Lieux : Nominatim · distances et durées : OSRM · données © contributeurs OpenStreetMap (ODbL). Prix suggéré : {{ (price_per_km_cents / 100)|number_format(2, ',') }} MAD par kilomètre.</p>
+            </div>
+
+            <div class="classic-form" data-classic-form>
+            {% if not form.vars.valid %}
+                <div class="flash flash-error" role="alert">
+                    {{ ui.icon('alert') }}
+                    <div>
+                        <p class="flash-title">Le trajet n'a pas été publié : corrigez les champs signalés ci-dessous.</p>
+                        {{ form_errors(form) }}
+                    </div>
+                </div>
+            {% endif %}
+
+            <section class="card form-section" aria-labelledby="step-vehicle" data-wizard-step="vehicle">
+                <div class="form-section-head">
+                    <span class="step-number" aria-hidden="true">1</span>
+                    <div>
+                        <h2 id="step-vehicle">Véhicule et places</h2>
+                        <p>Le nombre de places proposées ne peut pas dépasser celles du véhicule.</p>
+                    </div>
+                </div>
+                <div class="form-grid">
+                    {{ form_row(form.vehicle) }}
+                    {{ form_row(form.seatCapacity) }}
+                </div>
+                <p class="note">{{ ui.icon('car') }}<span>Un autre véhicule ? <a href="{{ path('app_driver_vehicles') }}">Gérer mes véhicules</a></span></p>
+            </section>
+
+            <section class="card form-section" aria-labelledby="step-itinerary" data-wizard-step="itinerary" data-collection data-geo-assist
+                     data-places-url="{{ path('app_geo_places') }}" data-known-url="{{ path('app_geo_known_places') }}" data-locality-url="{{ path('app_geo_locality') }}" data-route-url="{{ path('app_geo_route') }}"
+                     data-tiles="{{ map_tile_url }}" data-prototype="{{ _self.stop_fields(form.itinerary.vars.prototype, '__number__')|e('html_attr') }}">
+                <div class="form-section-head">
+                    <span class="step-number" aria-hidden="true">2</span>
+                    <div>
+                        <h2 id="step-itinerary">Itinéraire</h2>
+                        <p data-itinerary-intro>Étapes dans l'ordre du trajet, heures du Maroc. Le départ n'a qu'une heure de départ, l'arrivée qu'une heure d'arrivée.</p>
+                    </div>
+                </div>
+                {% if form.itinerary.vars.errors|length > 0 %}
+                    <div class="form-errors">{{ form_errors(form.itinerary) }}</div>
+                {% endif %}
+
+
+                <div data-collection-list>
+                    {% for line in form.itinerary %}{{ _self.stop_fields(line, loop.index) }}{% endfor %}
+                </div>
+                <button type="button" class="button button-secondary add-stop" data-collection-add>{{ ui.icon('plus') }}Ajouter une étape intermédiaire</button>
+
+                <p class="osm-credit">Lieux : Nominatim · distances : OSRM · données © contributeurs OpenStreetMap (ODbL). Prix suggéré : {{ (price_per_km_cents / 100)|number_format(2, ',') }} MAD par kilomètre.</p>
+            </section>
+
+            <section class="card form-section" aria-labelledby="step-price" data-wizard-step="price">
+                <div class="form-section-head">
+                    <span class="step-number" aria-hidden="true">3</span>
+                    <div>
+                        <h2 id="step-price">Prix</h2>
+                        <p>Vous fixez le prix du trajet entier ; un passager qui fait une partie du trajet paie selon la distance parcourue.</p>
+                    </div>
+                </div>
+                <div class="price-suggestion" data-price-suggestion hidden>
+                    <p><span class="muted">Prix estimé</span> <strong data-suggested-price></strong> <span class="muted" data-suggested-detail></span></p>
+                    <button type="button" class="button button-secondary button-small" data-use-price>Utiliser ce prix</button>
+                </div>
+                <div class="form-grid">
+                    {{ form_row(form.fullPriceCents, {attr: {inputmode: 'decimal', placeholder: 'Par exemple 200 ou 199,50'}}) }}
+                </div>
+            </section>
+
+            <section class="card form-section" aria-labelledby="step-recap" data-wizard-step="recap">
+                <div class="form-section-head">
+                    <span class="step-number" aria-hidden="true">4</span>
+                    <div>
+                        <h2 id="step-recap">Vérifier et publier</h2>
+                        <p>Le trajet apparaît dans les recherches dès sa publication.</p>
+                    </div>
+                </div>
+                <dl class="recap" data-recap hidden>
+                    <div class="recap-route"><dt>Itinéraire</dt><dd data-recap-field="route"></dd></div>
+                    <div><dt>Départ</dt><dd data-recap-field="departure"></dd></div>
+                    <div><dt>Arrivée</dt><dd data-recap-field="arrival"></dd></div>
+                    <div><dt>Distance totale</dt><dd data-recap-field="distance"></dd></div>
+                    <div><dt>Places proposées</dt><dd data-recap-field="seats"></dd></div>
+                    <div><dt>Prix du trajet complet</dt><dd data-recap-field="price"></dd></div>
+                </dl>
+                <p class="callout">{{ ui.icon('lock') }}<span><strong>À savoir :</strong> dès la première réservation, l'itinéraire (étapes, horaires, points de rendez-vous et distances) ne pourra plus être modifié. Vous pourrez toujours annuler le trajet avant son départ, avec un motif communiqué aux passagers.</span></p>
+                <div class="form-actions">
+                    <button class="button button-large" type="submit" data-busy-label="Publication…">Publier le trajet</button>
+                </div>
+            </section>
+
+            {% do form.itinerary.setRendered %}
+            </div>
+        {{ form_end(form) }}
+
+    </div>
+{% endblock %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" href="{{ asset('vendor/leaflet/leaflet.css') }}">
 {% endblock %}
 
 {% block javascripts %}
-    <script src="{{ asset('js/collection.js') }}" defer></script>
-    <script src="{{ asset('js/geo-assist.js') }}" defer></script>
+    <script src="{{ asset('vendor/leaflet/leaflet.js') }}" defer></script>
+    <script src="{{ asset('js/itinerary-form.js') }}" defer></script>
+    <script src="{{ asset('js/publish-wizard.js') }}" defer></script>
 {% endblock %}

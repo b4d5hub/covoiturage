@@ -9,14 +9,17 @@ use App\Enum\TripStatus;
 use App\Exception\DomainRuleException;
 use App\Form\Model\ItineraryLine;
 use App\Form\PublishTripType;
+use App\Form\TripTermsType;
 use App\Form\VehicleType;
 use App\Repository\BookingRepository;
 use App\Repository\ReviewRepository;
 use App\Repository\TripRepository;
+use App\Service\TripCapacityManager;
 use App\Service\TripLifecycleService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
+use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -55,7 +58,8 @@ final class DriverController extends AbstractController
             $item = [
                 'trip' => $trip,
                 'passengers' => $passengers,
-                'occupancy' => $isPublished ? $bookings->occupiedSeatsBySegment($trip) : [],
+                'occupancy' => $occupancy = $isPublished ? $bookings->occupiedSeatsBySegment($trip) : [],
+                'peak' => [] === $occupancy ? 0 : max($occupancy),
                 'canCancel' => $isPublished && $now < $trip->getDepartureAt(),
                 'canComplete' => $isPublished && $now >= $lastArrival,
                 'reviewable' => $reviewable,
@@ -70,6 +74,10 @@ final class DriverController extends AbstractController
         }
 
         $sections['upcoming'] = array_reverse($sections['upcoming']);
+
+        foreach ($sections['upcoming'] as $index => $item) {
+            $sections['upcoming'][$index]['termsForm'] = $this->termsForm($item['trip'])->createView();
+        }
 
         return $this->render('driver/index.html.twig', $sections + ['hasVehicle' => !$driver->getVehicles()->isEmpty()]);
     }
@@ -86,7 +94,15 @@ final class DriverController extends AbstractController
             return $this->redirectToRoute('app_driver_vehicles');
         }
 
-        $form = $this->createForm(PublishTripType::class, null, ['driver' => $driver]);
+        // Trajet retour : étapes de l'aller dans l'ordre inverse, même véhicule, mêmes places et même prix.
+        $returnOf = $request->query->getInt('retour') > 0 ? $entityManager->getRepository(Trip::class)->find($request->query->getInt('retour')) : null;
+        $returnOf = $returnOf?->getDriver() === $driver ? $returnOf : null;
+
+        $form = $this->createForm(PublishTripType::class, null === $returnOf ? null : [
+            'vehicle' => $returnOf->getVehicle(),
+            'seatCapacity' => $returnOf->getSeatCapacity(),
+            'fullPriceCents' => $returnOf->getFullPriceCents(),
+        ], ['driver' => $driver, 'itinerary' => null === $returnOf ? null : ItineraryLine::returnOf($returnOf)]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -120,7 +136,7 @@ final class DriverController extends AbstractController
             }
         }
 
-        return $this->render('driver/publish.html.twig', ['form' => $form], new Response(null, $form->isSubmitted() ? 422 : 200));
+        return $this->render('driver/publish.html.twig', ['form' => $form, 'returnOf' => $returnOf], new Response(null, $form->isSubmitted() ? 422 : 200));
     }
 
     #[Route('/trajets/{id}/annuler', name: 'app_driver_cancel', methods: ['POST'])]
@@ -151,6 +167,44 @@ final class DriverController extends AbstractController
         }
 
         return $this->redirectToRoute('app_driver');
+    }
+
+    #[Route('/trajets/{id}/conditions', name: 'app_driver_terms', methods: ['POST'])]
+    public function terms(Trip $trip, Request $request, TripCapacityManager $manager): Response
+    {
+        if ($trip->getDriver() !== $this->getUser()) {
+            throw $this->createAccessDeniedException();
+        }
+
+        $form = $this->termsForm($trip);
+        $form->handleRequest($request);
+
+        if (TripStatus::Published !== $trip->getStatus() || new \DateTimeImmutable() >= $trip->getDepartureAt()) {
+            $this->addFlash('error', 'Les places et le prix ne se modifient plus une fois le trajet parti, annulé ou effectué.');
+        } elseif (!$form->isSubmitted() || !$form->isValid()) {
+            $errors = iterator_to_array($form->getErrors(true));
+            $this->addFlash('error', [] === $errors ? 'Modification refusée.' : $errors[0]->getMessage());
+        } else {
+            try {
+                $manager->changeTerms($trip, $form->get('seatCapacity')->getData(), $form->get('fullPriceCents')->getData());
+                $this->addFlash('success', 'Trajet '.$trip->getRouteLabel().' mis à jour. Le nouveau prix s\'applique aux prochaines réservations.');
+            } catch (DomainRuleException $exception) {
+                $this->addFlash('error', $exception->getMessage());
+            }
+        }
+
+        return $this->redirect($this->generateUrl('app_driver').'#trajet-'.$trip->getId());
+    }
+
+    private function termsForm(Trip $trip): FormInterface
+    {
+        return $this->container->get('form.factory')->createNamed('terms_'.$trip->getId(), TripTermsType::class, [
+            'seatCapacity' => $trip->getSeatCapacity(),
+            'fullPriceCents' => $trip->getFullPriceCents(),
+        ], [
+            'action' => $this->generateUrl('app_driver_terms', ['id' => $trip->getId()]),
+            'max_seats' => $trip->getVehicle()?->getPassengerSeats(),
+        ]);
     }
 
     #[Route('/vehicules', name: 'app_driver_vehicles')]

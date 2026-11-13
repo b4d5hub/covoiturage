@@ -39,6 +39,26 @@ final class ItineraryLine
         return $lines;
     }
 
+    /**
+     * Itinéraire du trajet retour : mêmes étapes et mêmes distances, dans l'ordre inverse, sans horaires.
+     *
+     * @return list<self>
+     */
+    public static function returnOf(Trip $trip): array
+    {
+        $lines = array_reverse(self::fromTrip($trip));
+        $count = \count($lines);
+
+        foreach ($lines as $index => $line) {
+            $line->arrivalAt = null;
+            $line->departureAt = null;
+            // La distance vers l'étape suivante du retour est celle du tronçon aller entre ces deux étapes.
+            $line->distanceToNextMeters = $index < $count - 1 ? $trip->getSegmentAt($count - 2 - $index)?->getDistanceMeters() : null;
+        }
+
+        return $lines;
+    }
+
     public function isComplete(): bool
     {
         return null !== $this->city && null !== $this->meetingAddress && null !== $this->latitude && null !== $this->longitude;
